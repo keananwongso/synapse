@@ -168,7 +168,3 @@ Set environment variables in Vercel dashboard:
 ## 📄 License
 
 MIT
-
----
-
-**Have fun brainstorming! 🧠✨**

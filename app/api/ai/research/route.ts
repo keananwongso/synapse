@@ -3,12 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-
-    // Support both old and new interfaces
-    const topic = body.topic || body.clusterLabel;
-    const count = body.count || 3;
-    const focus = body.focus || '';
+    const { topic, count = 3, focus } = await req.json();
 
     if (!topic) {
       return NextResponse.json(
@@ -17,13 +12,13 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log('🧠 Creating brainstorm task:', topic, '| Count:', count);
+    console.log('🔍 Creating research task:', topic, '| Count:', count);
 
     // Create task in Supabase (Fetch.ai agent will pick it up)
     const { data: task, error } = await supabase
       .table('tasks')
       .insert({
-        type: 'brainstorm',
+        type: 'research',
         input: { topic, count, focus }
       })
       .select()
@@ -32,7 +27,7 @@ export async function POST(req: Request) {
     if (error) {
       console.error('❌ Failed to create task:', error);
       return NextResponse.json(
-        { error: 'Failed to create brainstorm task', details: error.message },
+        { error: 'Failed to create research task', details: error.message },
         { status: 500 }
       );
     }
@@ -43,9 +38,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ taskId: task.id });
 
   } catch (error: any) {
-    console.error('Brainstorm error:', error);
+    console.error('Research error:', error);
     return NextResponse.json(
-      { error: 'Failed to brainstorm', details: error.message },
+      { error: 'Failed to research', details: error.message },
       { status: 500 }
     );
   }

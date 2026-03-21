@@ -6,6 +6,7 @@ import { InputBar } from '@/components/InputBar';
 import { ActionPanel } from '@/components/ActionPanel';
 import { Node, Connection, Cluster } from '@/lib/types';
 import { usePhysics } from '@/hooks/usePhysics';
+import { useAgentResults } from '@/hooks/useAgentResults';
 import { generateId, debounce } from '@/lib/utils';
 import { initializeNodePhysics } from '@/lib/physics';
 
@@ -23,6 +24,25 @@ export default function DriftPage() {
     connections,
     onUpdate: setNodes,
     enabled: true,
+  });
+
+  // Listen for agent results via Realtime
+  useAgentResults((nodeType, results) => {
+    console.log('🎉 Agent results received:', nodeType, results);
+
+    // Spawn nodes from results
+    const newNodeData = results.map((result: any) => ({
+      text: result.text,
+      isAI: true,
+      nodeType: nodeType as Node['nodeType'],
+      metadata: result.metadata || {},
+    }));
+
+    spawnNodesFromChatbox(newNodeData);
+
+    // Clear processing state
+    setIsProcessing(false);
+    setProcessingStatus('');
   });
 
   // Helper: Spawn nodes from chatbox position (bottom-center of viewport)
@@ -99,6 +119,7 @@ export default function DriftPage() {
         // Step 2: Execute the appropriate action
         if (action === 'brainstorm') {
           console.log('🧠 Brainstorming:', parameters.topic);
+          setProcessingStatus('Dispatching brainstorm agent...');
 
           const brainstormResponse = await fetch('/api/ai/brainstorm', {
             method: 'POST',
@@ -112,17 +133,11 @@ export default function DriftPage() {
 
           if (!brainstormResponse.ok) throw new Error('Brainstorm failed');
 
-          const { ideas } = await brainstormResponse.json();
+          const { taskId } = await brainstormResponse.json();
+          console.log('📝 Task created:', taskId);
+          setProcessingStatus('Waiting for agent results...');
 
-          // Spawn idea nodes from chatbox
-          spawnNodesFromChatbox(
-            ideas.map((idea: any) => ({
-              text: idea.text,
-              isAI: true,
-              nodeType: 'ai_idea',
-              metadata: { source: 'brainstorm', topic: parameters.topic },
-            }))
-          );
+          // Results will arrive via Realtime subscription (handled by useAgentResults hook)
         } else if (action === 'note') {
           // Simple note - just add as a thought node
           spawnNodesFromChatbox([
@@ -133,21 +148,43 @@ export default function DriftPage() {
               metadata: {},
             },
           ]);
+
+          // Clear processing state immediately for notes (no agent needed)
+          setIsProcessing(false);
+          setProcessingStatus('');
         } else if (action === 'research') {
-          // TODO: Implement research action
-          console.log('🔍 Research not implemented yet');
+          console.log('🔍 Researching:', parameters.topic);
+          setProcessingStatus('Dispatching research agent...');
+
+          const researchResponse = await fetch('/api/ai/research', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              topic: parameters.topic,
+              count: parameters.count || 3,
+              focus: parameters.focus,
+            }),
+          });
+
+          if (!researchResponse.ok) throw new Error('Research failed');
+
+          const { taskId } = await researchResponse.json();
+          console.log('📝 Task created:', taskId);
+          setProcessingStatus('Waiting for agent results...');
+
+          // Results will arrive via Realtime subscription (handled by useAgentResults hook)
         } else if (action === 'analyze') {
           // TODO: Implement analyze action (cluster existing nodes)
           console.log('🔬 Analyze not implemented yet');
         }
 
-        console.log('✅ Action complete');
+        console.log('✅ Task dispatched');
       } catch (error) {
         console.error('❌ Chat processing error:', error);
-      } finally {
         setIsProcessing(false);
         setProcessingStatus('');
       }
+      // Don't clear processing state in finally - useAgentResults will handle that when results arrive
     },
     [nodes, clusters, spawnNodesFromChatbox]
   );
@@ -184,59 +221,33 @@ export default function DriftPage() {
     );
 
     console.log('🧠 Brainstorming for cluster:', selectedCluster.label);
+    setIsProcessing(true);
+    setProcessingStatus('Dispatching brainstorm agent...');
 
     try {
       const response = await fetch('/api/ai/brainstorm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clusterLabel: selectedCluster.label,
-          thoughts: clusterNodes.map((n) => n.text),
-          nodeIds: selectedCluster.nodeIds,
+          topic: selectedCluster.label,
+          count: 3,
+          focus: clusterNodes.map((n) => n.text).join(', '),
         }),
       });
 
       if (!response.ok) throw new Error('Brainstorm failed');
 
-      const { ideas } = await response.json();
+      const { taskId } = await response.json();
+      console.log('📝 Task created:', taskId);
+      setProcessingStatus('Waiting for agent results...');
 
-      console.log('✅ Generated', ideas.length, 'new ideas');
-
-      // Add AI idea nodes
-      const aiNodes: Node[] = ideas.map((idea: any) =>
-        initializeNodePhysics({
-          id: generateId(),
-          text: idea.text,
-          x: clusterNodes[0].x + (Math.random() - 0.5) * 200,
-          y: clusterNodes[0].y + (Math.random() - 0.5) * 200,
-          vx: 0,
-          vy: 0,
-          isAI: true,
-          isDragging: false,
-          nodeType: 'ai_idea',
-          metadata: {},
-          relatedNodeIds: idea.relatedNodeIds,
-        })
-      );
-
-      setNodes((prev) => [...prev, ...aiNodes]);
-
-      // Create connections to related nodes
-      const newConnections: Connection[] = aiNodes.flatMap((aiNode) =>
-        aiNode.relatedNodeIds.map((relatedId) => ({
-          id: generateId(),
-          from: aiNode.id,
-          to: relatedId,
-          strength: 0.7,
-        }))
-      );
-
-      setConnections((prev) => [...prev, ...newConnections]);
-      wake();
+      // Results will arrive via Realtime subscription (handled by useAgentResults hook)
     } catch (error) {
       console.error('❌ Brainstorm error:', error);
+      setIsProcessing(false);
+      setProcessingStatus('');
     }
-  }, [selectedCluster, nodes, wake]);
+  }, [selectedCluster, nodes]);
 
   return (
     <main className="w-screen h-screen overflow-hidden">
