@@ -1,0 +1,4 @@
+uagents>=0.22.0,<0.25.0
+supabase>=2.12.0
+google-generativeai>=0.8.0
+python-dotenv>=1.0.0
