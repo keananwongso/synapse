@@ -17,6 +17,8 @@ export default function DriftPage() {
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
+  const [pan, setPan] = useState({ x: 400, y: 300 });
+  const [zoom, setZoom] = useState(1);
 
   // Physics simulation
   const { wake } = usePhysics({
@@ -24,6 +26,8 @@ export default function DriftPage() {
     connections,
     onUpdate: setNodes,
     enabled: true,
+    pan,
+    zoom,
   });
 
   // Listen for agent results via Realtime
@@ -48,10 +52,9 @@ export default function DriftPage() {
   // Helper: Spawn nodes from chatbox position (bottom-center of viewport)
   const spawnNodesFromChatbox = useCallback(
     (nodeData: Array<{ text: string; isAI: boolean; nodeType: Node['nodeType']; metadata?: any }>) => {
-      // Chatbox is at bottom-center in screen coordinates
-      // Convert to world coordinates (for now, just use center of viewport)
-      const baseX = window.innerWidth / 2;
-      const baseY = window.innerHeight - 150; // Above the chatbox
+      // Convert screen center to world coordinates using current pan/zoom
+      const baseX = (window.innerWidth / 2 - pan.x) / zoom;
+      const baseY = (window.innerHeight / 2 - pan.y) / zoom;
 
       const newNodes: Node[] = nodeData.map((data, index) => {
         // Add some spread so nodes don't spawn on top of each other
@@ -85,7 +88,7 @@ export default function DriftPage() {
 
       return newNodes;
     },
-    [wake]
+    [wake, pan, zoom]
   );
 
   // Handle chat input submission
@@ -189,13 +192,20 @@ export default function DriftPage() {
     [nodes, clusters, spawnNodesFromChatbox]
   );
 
-  // Handle node drag
+  // Handle node drag (with optional throw velocity on release)
   const handleNodeDrag = useCallback(
-    (id: string, x: number, y: number, isDragging: boolean) => {
+    (id: string, x: number, y: number, isDragging: boolean, throwVx?: number, throwVy?: number) => {
       setNodes((prev) =>
         prev.map((node) =>
           node.id === id
-            ? { ...node, x, y, isDragging, vx: 0, vy: 0 }
+            ? {
+                ...node,
+                x,
+                y,
+                isDragging,
+                vx: isDragging ? 0 : (throwVx || 0),
+                vy: isDragging ? 0 : (throwVy || 0),
+              }
             : node
         )
       );
@@ -259,6 +269,9 @@ export default function DriftPage() {
         onNodeDrag={handleNodeDrag}
         onCanvasClick={() => setSelectedCluster(null)}
         onClusterClick={handleClusterClick}
+        initialPan={pan}
+        onPanChange={setPan}
+        onZoomChange={setZoom}
       />
 
       {/* Input bar */}
@@ -283,9 +296,9 @@ export default function DriftPage() {
 
       {/* Status indicator */}
       {isProcessing && processingStatus && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-indigo-950/60 backdrop-blur-sm
-                        rounded-full border border-indigo-500/20 text-xs text-indigo-300 flex items-center gap-2 animate-in">
-          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-[#E7E3DC]/90 backdrop-blur-sm
+                        rounded-full border border-[#CFCBC3] text-xs text-[#1A1A1A]/70 flex items-center gap-2 animate-in">
+          <div className="w-2 h-2 bg-[#D4A857] rounded-full animate-pulse" />
           {processingStatus}
         </div>
       )}

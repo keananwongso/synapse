@@ -2,8 +2,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0f;
-  --foreground: #ededed;
+  --background: #F5F3EE;
+  --foreground: #1A1A1A;
+  --accent: #D4A857;
+  --neutral: #E7E3DC;
+  --subtle: #CFCBC3;
+  --mouse-x: 50%;
+  --mouse-y: 50%;
 }
 
 @theme inline {
@@ -24,76 +29,99 @@ body {
   overflow: hidden;
 }
 
-/* Canvas background with dot grid */
+/* Canvas background with dot grid + mouse-following glow */
 .canvas-bg {
-  background-color: #0a0a0f;
-  background-image: radial-gradient(circle, rgba(99, 102, 241, 0.06) 1px, transparent 1px);
-  background-size: 30px 30px;
+  background-color: #F5F3EE;
+  background-image:
+    radial-gradient(800px circle at var(--mouse-x) var(--mouse-y), rgba(212, 168, 87, 0.04), transparent 40%),
+    radial-gradient(circle, #CFCBC3 1px, transparent 1px);
+  background-size: 100% 100%, 30px 30px;
 }
 
-/* Smooth animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+/* Vignette overlay */
+.vignette::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.08) 100%);
+  z-index: 1;
 }
 
-@keyframes slideInFromRight {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
+/* Node spawn: scale up with overshoot, then settle */
 @keyframes spawnNode {
-  from {
+  0% {
     opacity: 0;
-    transform: scale(0.3);
+    transform: scale(0);
   }
-  to {
+  60% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+.node-spawn {
+  animation: spawnNode 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Fade in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .animate-in {
   animation: fadeIn 0.3s ease-out;
 }
 
+/* Slide in from right */
+@keyframes slideInFromRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 .slide-in-from-right {
   animation: slideInFromRight 0.25s ease-out;
 }
 
-.node-spawn {
-  animation: spawnNode 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+/* Connection draw-in animation */
+@keyframes drawConnection {
+  from { stroke-dashoffset: 1000; opacity: 0.7; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+
+.connection-new {
+  stroke-dasharray: 1000;
+  animation: drawConnection 0.6s ease-out forwards;
+}
+
+/* Cluster pulse */
+@keyframes clusterPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.cluster-pulse {
+  animation: clusterPulse 0.3s ease-in-out;
 }
 
 /* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.3);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.5);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.7);
-}
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #F2EFE9; }
+::-webkit-scrollbar-thumb { background: #CFCBC3; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #B8B3AB; }
 
 /* Pointer events fix for canvas children */
 .pointer-events-none > * {
   pointer-events: auto;
+}
+
+/* Focus glow for input */
+.input-glow:focus-within {
+  box-shadow: 0 0 0 1px rgba(212, 168, 87, 0.3), 0 8px 30px rgba(0, 0, 0, 0.08);
 }

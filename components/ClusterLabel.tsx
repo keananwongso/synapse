@@ -37,11 +37,11 @@ export function ClusterLabel({ cluster, nodes, onClick }: ClusterLabelProps) {
     >
       <button
         onClick={() => onClick && onClick(cluster)}
-        className="px-3 py-1.5 rounded-full bg-indigo-950/40 border border-indigo-500/20
-                   backdrop-blur-sm text-xs text-indigo-300/80 font-medium
-                   hover:bg-indigo-950/60 hover:border-indigo-500/30 hover:text-indigo-200
+        className="px-3 py-1.5 rounded-full bg-[#E7E3DC] border border-[#D4A857]/40
+                   text-xs text-[#1A1A1A]/70 font-medium
+                   hover:bg-[#D4A857]/20 hover:border-[#D4A857]/60 hover:text-[#1A1A1A]
                    transition-all duration-200 cursor-pointer
-                   shadow-lg shadow-indigo-500/5"
+                   shadow-sm"
       >
         {cluster.label}
       </button>

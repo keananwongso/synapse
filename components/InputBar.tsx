@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { CornerRightUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
+import { useAutoResizeTextarea } from '@/components/hooks/use-auto-resize-textarea';
 
 interface InputBarProps {
   onSubmit: (text: string) => void;
@@ -11,83 +14,110 @@ interface InputBarProps {
 export function InputBar({
   onSubmit,
   placeholder = "What's on your mind?",
-  isProcessing = false
+  isProcessing = false,
 }: InputBarProps) {
-  const [value, setValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [inputValue, setInputValue] = useState('');
+
+  const { textareaRef, adjustHeight } = useAutoResizeTextarea({
+    minHeight: 52,
+    maxHeight: 200,
+  });
 
   // Focus shortcut: / key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '/' && document.activeElement !== inputRef.current) {
+      if (e.key === '/' && document.activeElement !== textareaRef.current) {
         e.preventDefault();
-        inputRef.current?.focus();
+        textareaRef.current?.focus();
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [textareaRef]);
 
   const handleSubmit = () => {
-    const trimmed = value.trim();
-    if (trimmed && !isProcessing) {
-      onSubmit(trimmed);
-      setValue('');
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSubmit();
-    }
-    if (e.key === 'Escape') {
-      inputRef.current?.blur();
-    }
+    const trimmed = inputValue.trim();
+    if (!trimmed || isProcessing) return;
+    onSubmit(trimmed);
+    setInputValue('');
+    adjustHeight(true);
   };
 
   return (
-    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
-      <div
-        className="bg-slate-900/80 backdrop-blur-xl border border-slate-700/40
-                   rounded-2xl px-5 py-3 shadow-2xl shadow-indigo-500/5
-                   min-w-[400px] max-w-[500px]
-                   focus-within:border-indigo-500/30 focus-within:shadow-indigo-500/10
-                   transition-all duration-300"
-      >
-        <div className="flex items-center gap-3">
-          <input
-            ref={inputRef}
-            type="text"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={handleKeyDown}
+    <div
+      className="fixed bottom-8 z-50 pointer-events-auto"
+      style={{ left: '50%', transform: 'translateX(-50%)', width: '576px', maxWidth: 'calc(100vw - 2rem)' }}
+    >
+      <div className="relative w-full flex flex-col gap-2">
+        {/* Input container with glass morphism */}
+        <div className={cn(
+          'relative w-full rounded-3xl input-glow transition-all duration-300',
+          'backdrop-blur-xl bg-[#F2EFE9]/85 border border-[#CFCBC3]',
+          'shadow-lg shadow-black/5',
+        )}>
+          <textarea
+            id="drift-input"
             placeholder={placeholder}
-            className="flex-1 bg-transparent text-slate-200 text-sm
-                       placeholder:text-slate-500 outline-none
-                       disabled:opacity-50"
-            autoFocus
+            ref={textareaRef}
+            value={inputValue}
             disabled={isProcessing}
+            autoFocus
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+              setInputValue(e.target.value);
+              adjustHeight();
+            }}
+            onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+              if (e.key === 'Escape') {
+                textareaRef.current?.blur();
+              }
+            }}
+            style={{
+              minHeight: '52px',
+              paddingLeft: '1.5rem',
+              paddingRight: '3rem',
+              paddingTop: '0.875rem',
+              paddingBottom: '0.875rem',
+            }}
+            className="w-full rounded-3xl bg-transparent border-none focus:outline-none text-[#1A1A1A] text-sm placeholder:text-[#1A1A1A]/30 resize-none leading-[1.5] disabled:opacity-50"
           />
-
-          {/* Processing indicator */}
-          {isProcessing && (
-            <div className="flex items-center gap-2 text-xs text-indigo-400">
-              <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
-              Processing...
-            </div>
-          )}
+          <button
+            onClick={handleSubmit}
+            className={cn(
+              'absolute right-3 top-1/2 -translate-y-1/2 rounded-xl p-1.5 transition-all duration-200',
+              isProcessing
+                ? 'bg-transparent'
+                : 'bg-[#E7E3DC] hover:bg-[#D4A857]/20'
+            )}
+            type="button"
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <div
+                className="w-4 h-4 bg-[#D4A857] rounded-sm animate-spin"
+                style={{ animationDuration: '3s' }}
+              />
+            ) : (
+              <CornerRightUp
+                className={cn(
+                  'w-4 h-4 transition-opacity text-[#1A1A1A]',
+                  inputValue ? 'opacity-70' : 'opacity-20'
+                )}
+              />
+            )}
+          </button>
         </div>
 
-        {/* Hint text */}
-        {!value && !isProcessing && (
-          <div className="mt-1 text-[10px] text-slate-600">
-            Press <kbd className="px-1 py-0.5 bg-slate-800/50 rounded border border-slate-700/30">Enter</kbd> to send
-            {' • '}
-            <kbd className="px-1 py-0.5 bg-slate-800/50 rounded border border-slate-700/30">/</kbd> to focus
-          </div>
-        )}
+        <p className="h-4 text-xs text-center text-[#1A1A1A]/35">
+          {isProcessing
+            ? 'AI is thinking...'
+            : inputValue
+            ? 'Enter to send · Shift+Enter for new line'
+            : 'Press / to focus'}
+        </p>
       </div>
     </div>
   );
