@@ -14,7 +14,8 @@ export default function DriftPage() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState('');
 
   // Physics simulation
   const { wake } = usePhysics({
@@ -24,90 +25,131 @@ export default function DriftPage() {
     enabled: true,
   });
 
-  // Analyze nodes with Gemini (debounced)
-  const analyzeNodes = useCallback(async (nodesToAnalyze: Node[]) => {
-    if (nodesToAnalyze.length < 2) return;
+  // Helper: Spawn nodes from chatbox position (bottom-center of viewport)
+  const spawnNodesFromChatbox = useCallback(
+    (nodeData: Array<{ text: string; isAI: boolean; nodeType: Node['nodeType']; metadata?: any }>) => {
+      // Chatbox is at bottom-center in screen coordinates
+      // Convert to world coordinates (for now, just use center of viewport)
+      const baseX = window.innerWidth / 2;
+      const baseY = window.innerHeight - 150; // Above the chatbox
 
-    setIsAnalyzing(true);
-    console.log('🧠 Analyzing', nodesToAnalyze.length, 'nodes...');
+      const newNodes: Node[] = nodeData.map((data, index) => {
+        // Add some spread so nodes don't spawn on top of each other
+        const angle = (Math.PI * 2 * index) / nodeData.length;
+        const spread = 80;
+        const offsetX = Math.cos(angle) * spread;
+        const offsetY = Math.sin(angle) * spread;
 
-    try {
-      const response = await fetch('/api/ai/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes: nodesToAnalyze }),
+        // Add outward velocity so nodes drift away from origin
+        const velocityStrength = 3;
+        const vx = Math.cos(angle) * velocityStrength;
+        const vy = Math.sin(angle) * velocityStrength;
+
+        return initializeNodePhysics({
+          id: generateId(),
+          text: data.text,
+          x: baseX + offsetX,
+          y: baseY + offsetY,
+          vx,
+          vy,
+          isAI: data.isAI,
+          isDragging: false,
+          nodeType: data.nodeType,
+          metadata: data.metadata || {},
+          relatedNodeIds: [],
+        });
       });
 
-      if (!response.ok) throw new Error('Analysis failed');
+      setNodes((prev) => [...prev, ...newNodes]);
+      wake(); // Wake physics
 
-      const { connections: newConnections, clusters: newClusters } = await response.json();
-
-      console.log('✅ Analysis complete:', newConnections.length, 'connections,', newClusters.length, 'clusters');
-
-      // Add IDs to connections and clusters
-      const connectionsWithIds = newConnections.map((conn: any) => ({
-        ...conn,
-        id: generateId(),
-      }));
-
-      const clustersWithCentroids = newClusters.map((cluster: any) => ({
-        ...cluster,
-        id: generateId(),
-        centroid: { x: 0, y: 0 }, // Will be calculated by ClusterLabel component
-      }));
-
-      setConnections(connectionsWithIds);
-      setClusters(clustersWithCentroids);
-
-      // Update node cluster IDs
-      setNodes((prev) =>
-        prev.map((node) => {
-          const cluster = clustersWithCentroids.find((c: Cluster) =>
-            c.nodeIds.includes(node.id)
-          );
-          return { ...node, clusterId: cluster?.id };
-        })
-      );
-    } catch (error) {
-      console.error('❌ Analysis error:', error);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, []);
-
-  // Debounced analysis trigger
-  const debouncedAnalyze = useCallback(
-    debounce((nodes: Node[]) => analyzeNodes(nodes), 1000),
-    [analyzeNodes]
+      return newNodes;
+    },
+    [wake]
   );
 
-  // Add a new thought node
-  const addNode = useCallback(
-    (text: string) => {
-      const newNode: Node = initializeNodePhysics({
-        id: generateId(),
-        text,
-        x: Math.random() * 600 + 200, // Random position near center
-        y: Math.random() * 400 + 200,
-        vx: 0,
-        vy: 0,
-        isAI: false,
-        isDragging: false,
-        nodeType: 'thought',
-        metadata: {},
-        relatedNodeIds: [],
-      });
+  // Handle chat input submission
+  const handleChatSubmit = useCallback(
+    async (input: string) => {
+      setIsProcessing(true);
+      setProcessingStatus('Understanding your request...');
 
-      setNodes((prev) => {
-        const updated = [...prev, newNode];
-        // Trigger analysis after adding node
-        debouncedAnalyze(updated);
-        return updated;
-      });
+      try {
+        // Step 1: Process input to determine intent
+        console.log('💬 Processing input:', input);
+        const processResponse = await fetch('/api/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            input,
+            context: {
+              nodeCount: nodes.length,
+              topics: clusters.map((c) => c.label),
+            },
+          }),
+        });
 
-      wake(); // Wake physics
+        if (!processResponse.ok) throw new Error('Failed to process input');
+
+        const { action, parameters, summary } = await processResponse.json();
+
+        console.log('🎯 Intent:', action, '|', summary);
+        setProcessingStatus(summary);
+
+        // Step 2: Execute the appropriate action
+        if (action === 'brainstorm') {
+          console.log('🧠 Brainstorming:', parameters.topic);
+
+          const brainstormResponse = await fetch('/api/ai/brainstorm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              topic: parameters.topic,
+              count: parameters.count || 3,
+              focus: parameters.focus,
+            }),
+          });
+
+          if (!brainstormResponse.ok) throw new Error('Brainstorm failed');
+
+          const { ideas } = await brainstormResponse.json();
+
+          // Spawn idea nodes from chatbox
+          spawnNodesFromChatbox(
+            ideas.map((idea: any) => ({
+              text: idea.text,
+              isAI: true,
+              nodeType: 'ai_idea',
+              metadata: { source: 'brainstorm', topic: parameters.topic },
+            }))
+          );
+        } else if (action === 'note') {
+          // Simple note - just add as a thought node
+          spawnNodesFromChatbox([
+            {
+              text: parameters.topic,
+              isAI: false,
+              nodeType: 'thought',
+              metadata: {},
+            },
+          ]);
+        } else if (action === 'research') {
+          // TODO: Implement research action
+          console.log('🔍 Research not implemented yet');
+        } else if (action === 'analyze') {
+          // TODO: Implement analyze action (cluster existing nodes)
+          console.log('🔬 Analyze not implemented yet');
+        }
+
+        console.log('✅ Action complete');
+      } catch (error) {
+        console.error('❌ Chat processing error:', error);
+      } finally {
+        setIsProcessing(false);
+        setProcessingStatus('');
+      }
     },
-    [debouncedAnalyze, wake]
+    [nodes, clusters, spawnNodesFromChatbox]
   );
 
   // Handle node drag
@@ -210,11 +252,12 @@ export default function DriftPage() {
 
       {/* Input bar */}
       <InputBar
-        onAddNode={addNode}
+        onSubmit={handleChatSubmit}
+        isProcessing={isProcessing}
         placeholder={
-          isAnalyzing
-            ? 'Analyzing connections...'
-            : "What's on your mind?"
+          isProcessing && processingStatus
+            ? processingStatus
+            : "What would you like to explore?"
         }
       />
 
@@ -228,11 +271,11 @@ export default function DriftPage() {
       />
 
       {/* Status indicator */}
-      {isAnalyzing && (
+      {isProcessing && processingStatus && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-indigo-950/60 backdrop-blur-sm
-                        rounded-full border border-indigo-500/20 text-xs text-indigo-300 flex items-center gap-2">
+                        rounded-full border border-indigo-500/20 text-xs text-indigo-300 flex items-center gap-2 animate-in">
           <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
-          Analyzing connections...
+          {processingStatus}
         </div>
       )}
     </main>

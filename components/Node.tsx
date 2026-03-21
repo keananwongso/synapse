@@ -58,6 +58,7 @@ export function Node({ node, onDrag, onDoubleClick, onClick }: NodeProps) {
           'px-4 py-3 rounded-xl backdrop-blur-sm border max-w-[240px]',
           'transition-all duration-300',
           'hover:scale-105',
+          'node-spawn',
           styles.bg,
           styles.border,
           styles.glow

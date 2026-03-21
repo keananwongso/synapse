@@ -3,11 +3,16 @@
 import { useState, useRef, useEffect } from 'react';
 
 interface InputBarProps {
-  onAddNode: (text: string) => void;
+  onSubmit: (text: string) => void;
   placeholder?: string;
+  isProcessing?: boolean;
 }
 
-export function InputBar({ onAddNode, placeholder = "What's on your mind?" }: InputBarProps) {
+export function InputBar({
+  onSubmit,
+  placeholder = "What's on your mind?",
+  isProcessing = false
+}: InputBarProps) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -26,8 +31,8 @@ export function InputBar({ onAddNode, placeholder = "What's on your mind?" }: In
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (trimmed) {
-      onAddNode(trimmed);
+    if (trimmed && !isProcessing) {
+      onSubmit(trimmed);
       setValue('');
     }
   };
@@ -51,22 +56,34 @@ export function InputBar({ onAddNode, placeholder = "What's on your mind?" }: In
                    focus-within:border-indigo-500/30 focus-within:shadow-indigo-500/10
                    transition-all duration-300"
       >
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          className="w-full bg-transparent text-slate-200 text-sm
-                     placeholder:text-slate-500 outline-none"
-          autoFocus
-        />
+        <div className="flex items-center gap-3">
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="flex-1 bg-transparent text-slate-200 text-sm
+                       placeholder:text-slate-500 outline-none
+                       disabled:opacity-50"
+            autoFocus
+            disabled={isProcessing}
+          />
+
+          {/* Processing indicator */}
+          {isProcessing && (
+            <div className="flex items-center gap-2 text-xs text-indigo-400">
+              <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
+              Processing...
+            </div>
+          )}
+        </div>
 
         {/* Hint text */}
-        {!value && (
+        {!value && !isProcessing && (
           <div className="mt-1 text-[10px] text-slate-600">
-            Press <kbd className="px-1 py-0.5 bg-slate-800/50 rounded border border-slate-700/30">Enter</kbd> to add
+            Press <kbd className="px-1 py-0.5 bg-slate-800/50 rounded border border-slate-700/30">Enter</kbd> to send
             {' • '}
             <kbd className="px-1 py-0.5 bg-slate-800/50 rounded border border-slate-700/30">/</kbd> to focus
           </div>

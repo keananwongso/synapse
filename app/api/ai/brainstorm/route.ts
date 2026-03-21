@@ -5,37 +5,42 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: Request) {
   try {
-    const { clusterLabel, thoughts, nodeIds } = await req.json();
+    const body = await req.json();
 
-    // Try different model names
-    const modelNames = ['gemini-3.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash'];
-    let model;
+    // Support both old and new interfaces
+    const topic = body.topic || body.clusterLabel;
+    const count = body.count || 3;
+    const focus = body.focus || '';
+    const thoughts = body.thoughts || [];
+    const nodeIds = body.nodeIds || [];
 
-    for (const modelName of modelNames) {
-      try {
-        model = genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.9, // Higher temperature for creativity
-          },
-        });
-        break;
-      } catch (e) {
-        continue;
-      }
+    if (!topic) {
+      return NextResponse.json(
+        { error: 'Topic is required' },
+        { status: 400 }
+      );
     }
 
-    if (!model) {
-      throw new Error('No available Gemini model found');
-    }
+    console.log('🧠 Brainstorming:', topic, '| Count:', count);
 
-    const prompt = `You are a creative brainstorming partner.
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash-exp',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.9, // Higher temperature for creativity
+      },
+    });
 
-Given this cluster of related thoughts about "${clusterLabel}":
+    // Build prompt based on whether we have existing thoughts or not
+    let prompt;
+    if (thoughts.length > 0) {
+      // Old interface: brainstorm from existing cluster
+      prompt = `You are a creative brainstorming partner.
+
+Given this cluster of related thoughts about "${topic}":
 ${thoughts.map((t: string, i: number) => `${i}. "${t}"`).join('\n')}
 
-Generate 2-3 new ideas that:
+Generate ${count} new ideas that:
 - Build on these thoughts in unexpected ways
 - Challenge assumptions or suggest new angles
 - Propose concrete next steps or actions
@@ -56,15 +61,43 @@ Rules:
 - Be specific and actionable, not generic
 - relatedToIndices should reference which input thoughts (by index) this idea builds on
 - Make connections that aren't obvious`;
+    } else {
+      // New interface: brainstorm from scratch
+      prompt = `You are a creative brainstorming partner.
+
+Topic: "${topic}"
+${focus ? `Focus on: ${focus}` : ''}
+
+Generate ${count} creative, actionable ideas related to this topic.
+
+Return JSON with this EXACT structure:
+{
+  "ideas": [
+    {
+      "text": "Your idea here (under 20 words)"
+    }
+  ]
+}
+
+Rules:
+- Each idea MUST be under 20 words
+- Be specific and actionable, not generic
+- Ideas should be diverse and explore different angles
+- Avoid obvious or cliché suggestions`;
+    }
 
     const result = await model.generateContent(prompt);
     const data = JSON.parse(result.response.text());
 
-    // Map indices to actual node IDs
+    // Map indices to actual node IDs if provided
     const ideas = data.ideas.map((idea: any) => ({
       text: idea.text,
-      relatedNodeIds: idea.relatedToIndices.map((idx: number) => nodeIds[idx]).filter(Boolean),
+      relatedNodeIds: idea.relatedToIndices
+        ? idea.relatedToIndices.map((idx: number) => nodeIds[idx]).filter(Boolean)
+        : [],
     }));
+
+    console.log('✅ Generated', ideas.length, 'ideas');
 
     return NextResponse.json({ ideas });
   } catch (error: any) {
