@@ -229,7 +229,7 @@ def poll_and_process():
                     results = handler(task)
 
                     # Write results to database (triggers Realtime update to frontend)
-                    supabase.table("agentx_results").insert({
+                    supabase.table("agent_results").insert({
                         "task_id": task_id,
                         "node_type": task_type,
                         "results": results
