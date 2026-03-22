@@ -457,6 +457,10 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text };
     setCenterMessages(prev => [...prev, userMsg]);
     setIsCenterChatLoading(true);
+    
+    // Instantly pop up the chat panel and push nodes aside while we wait
+    setResponseCard('thinking...');
+    setTimeout(() => pushNodesForCard(), 50);
 
     try {
       const agentContext = Array.from(agentStates.entries()).map(([id, state]) => {

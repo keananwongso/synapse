@@ -64,6 +64,7 @@ function ChatHistoryCard({ chatMessages, isChatLoading }: { chatMessages: ChatMe
         {/* Scrollable message list */}
         <div
           ref={scrollRef}
+          onWheel={(e) => e.stopPropagation()}
           style={{
             maxHeight: 340,
             overflowY: 'auto',
@@ -270,9 +271,6 @@ export function CenterNode({ data }: { data: CenterNodeData }) {
             tabIndex={isExpanded ? 0 : -1}
           />
           <div className="flex items-center gap-1" style={{ paddingRight: 10 }}>
-            {isChatLoading && (
-              <span className="text-[12px] text-[#aaa] animate-pulse mr-1">thinking...</span>
-            )}
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); handleSend(); }}
