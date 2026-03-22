@@ -682,21 +682,6 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
 
   return (
     <div className="w-full h-full">
-      {/* Floating navbar */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-        <div className="flex items-center gap-3 bg-white border border-[#e8e6e0] rounded-full px-5 py-2.5 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
-          <div className="w-7 h-7 bg-[#1a1a2e] rounded-lg flex items-center justify-center">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="4" cy="7" r="2" fill="white" />
-              <circle cx="10" cy="7" r="2" fill="white" />
-              <line x1="6" y1="7" x2="8" y2="7" stroke="white" strokeWidth="1.5" />
-            </svg>
-          </div>
-          <span className="text-[15px] font-medium text-[#1a1a2e]">Synapse</span>
-          <div className="w-px h-4 bg-[#e8e6e0] mx-1" />
-          <span className="text-[13px] text-[#888780] truncate max-w-[200px]">{idea}</span>
-        </div>
-      </div>
 
       <ReactFlow
         nodes={nodes}

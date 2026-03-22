@@ -107,43 +107,44 @@ export default function SynapsePage() {
     inputRef.current?.focus();
   };
 
-  // ─── HOMEPAGE ───
-  if (phase === 'homepage' || phase === 'collapsing') {
-    return (
-      <div className="h-screen w-screen dot-grid flex flex-col items-center overflow-hidden" style={{ paddingTop: '18vh', position: 'relative' }}>
-        {/* Static corner orbs — anchored deep into corners */}
-        <div style={{ position: 'fixed', top: -300, left: -300, width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(155,142,196,0.75) 0%, rgba(155,142,196,0.35) 40%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
-        <div style={{ position: 'fixed', top: -300, right: -300, width: 680, height: 680, borderRadius: '50%', background: 'radial-gradient(circle, rgba(123,169,154,0.7) 0%, rgba(123,169,154,0.3) 40%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
-        <div style={{ position: 'fixed', bottom: -300, left: -300, width: 660, height: 660, borderRadius: '50%', background: 'radial-gradient(circle, rgba(196,149,106,0.7) 0%, rgba(196,149,106,0.3) 40%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
-        <div style={{ position: 'fixed', bottom: -300, right: -300, width: 680, height: 680, borderRadius: '50%', background: 'radial-gradient(circle, rgba(176,122,138,0.7) 0%, rgba(176,122,138,0.3) 40%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+  // ─── UNIFIED RENDER ───
+  return (
+    <div className={`h-screen w-screen overflow-hidden relative ${phase !== 'canvas' ? 'dot-grid' : ''}`}>
+      {/* Static corner orbs — anchored deep into corners, present in all phases */}
+      <div style={{ position: 'fixed', top: -300, left: -300, width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(155,142,196,0.75) 0%, rgba(155,142,196,0.35) 40%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', top: -300, right: -300, width: 680, height: 680, borderRadius: '50%', background: 'radial-gradient(circle, rgba(123,169,154,0.7) 0%, rgba(123,169,154,0.3) 40%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', bottom: -300, left: -300, width: 660, height: 660, borderRadius: '50%', background: 'radial-gradient(circle, rgba(196,149,106,0.7) 0%, rgba(196,149,106,0.3) 40%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', bottom: -300, right: -300, width: 680, height: 680, borderRadius: '50%', background: 'radial-gradient(circle, rgba(176,122,138,0.7) 0%, rgba(176,122,138,0.3) 40%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
 
-        {/* Cursor-following orb */}
-        <div
-          ref={orbRef}
-          style={{
-            position: 'fixed',
-            width: 400,
-            height: 400,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(122,155,191,0.6) 0%, rgba(122,155,191,0.2) 35%, transparent 65%)',
-            left: -999,
-            top: -999,
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'none',
-            zIndex: 0,
-            willChange: 'left, top',
-          }}
-        />
+      {/* Cursor-following orb */}
+      <div
+        ref={orbRef}
+        style={{
+          position: 'fixed',
+          width: 400,
+          height: 400,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(122,155,191,0.6) 0%, rgba(122,155,191,0.2) 35%, transparent 65%)',
+          left: -999,
+          top: -999,
+          transform: 'translate(-50%, -50%)',
+          pointerEvents: 'none',
+          zIndex: 0,
+          willChange: 'left, top',
+        }}
+      />
 
-        {/* Content */}
+      {/* HOMEPAGE LAYER */}
+      {(phase === 'homepage' || phase === 'collapsing') && (
         <div
-          className="flex flex-col items-center px-6 w-full"
+          className="absolute inset-0 flex flex-col items-center px-6 w-full"
           style={{
-            position: 'relative',
+            paddingTop: '18vh',
             zIndex: 1,
-            opacity: phase === 'collapsing' ? 0 : undefined,
-            transform: phase === 'collapsing' ? 'translateY(-30px) scale(0.98)' : undefined,
-            transition: phase === 'collapsing' ? 'all 0.5s cubic-bezier(0.4,0,0.2,1)' : undefined,
+            opacity: phase === 'collapsing' ? 0 : 1,
+            transform: phase === 'collapsing' ? 'translateY(-30px) scale(0.98)' : 'none',
+            transition: 'all 0.5s cubic-bezier(0.4,0,0.2,1)',
+            pointerEvents: phase === 'collapsing' ? 'none' : 'auto',
           }}
         >
           {/* Heading */}
@@ -223,14 +224,14 @@ export default function SynapsePage() {
             </p>
           </div>
         </div>
-      </div>
-    );
-  }
+      )}
 
-  // ─── CANVAS ───
-  return (
-    <div className="h-screen w-screen">
-      <SynapseCanvas idea={idea} branches={branches} isLoading={isLoading} />
+      {/* CANVAS LAYER */}
+      {phase === 'canvas' && (
+        <div className="absolute inset-0 z-10 w-full h-full animate-in fade-in duration-500">
+          <SynapseCanvas idea={idea} branches={branches} isLoading={isLoading} />
+        </div>
+      )}
     </div>
   );
 }
