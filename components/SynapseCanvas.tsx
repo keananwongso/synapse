@@ -39,6 +39,7 @@ interface Deliverable {
   title: string;
   summary: string;
   content: string;
+  html?: string;
   type: string;
 }
 
@@ -276,7 +277,8 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         data: {
           title: deliv.title,
           summary: deliv.summary,
-          content: deliv.content,
+          content: deliv.content || '',
+          html: deliv.html,
           type: deliv.type,
           color,
           isExpanded: false,

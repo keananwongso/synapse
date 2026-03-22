@@ -1,4 +1,4 @@
-// Core type definitions for Drift
+// Core type definitions for Synapse
 
 export interface Node {
   id: string;

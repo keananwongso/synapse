@@ -2,12 +2,13 @@
 
 import { Handle, Position } from 'reactflow';
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { FileText, X } from 'lucide-react';
+import { FileText, Globe, X } from 'lucide-react';
 
 interface DeliverableNodeData {
   title: string;
   summary: string;
   content: string;
+  html?: string;
   type: 'doc' | 'chart' | 'mockup';
   color: string;
   isExpanded: boolean;
@@ -21,7 +22,8 @@ const CHIP_WIDTH = 130;
 const STEM = 16;
 
 export function DeliverableNode({ data }: { data: DeliverableNodeData }) {
-  const { title, summary, content, color, isExpanded, onExpand, onCollapse, isDimmed } = data;
+  const { title, summary, content, html, type, color, isExpanded, onExpand, onCollapse, isDimmed } = data;
+  const isMockup = type === 'mockup';
   const editorRef = useRef<HTMLDivElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
   const [dir, setDir] = useState<'above' | 'below' | 'left' | 'right'>('above');
@@ -122,7 +124,10 @@ export function DeliverableNode({ data }: { data: DeliverableNodeData }) {
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid rgba(0,0,0,0.05)', backgroundColor: '#faf9f7', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <FileText style={{ width: 16, height: 16, color }} />
+              {isMockup
+                ? <Globe style={{ width: 16, height: 16, color }} />
+                : <FileText style={{ width: 16, height: 16, color }} />
+              }
               <span style={{ fontSize: 15, fontWeight: 600, color: '#1a1a2e', letterSpacing: '-0.2px' }}>{title}</span>
             </div>
             <button
@@ -136,27 +141,38 @@ export function DeliverableNode({ data }: { data: DeliverableNodeData }) {
           </div>
 
           {/* Summary */}
-          {summary && (
+          {summary && !isMockup && (
             <div style={{ padding: '12px 24px 0', fontSize: 13, lineHeight: 1.6, color: '#888780', flexShrink: 0 }}>
               {summary}
             </div>
           )}
 
-          {/* Editable body */}
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            spellCheck={false}
-            onKeyDown={(e) => e.stopPropagation()}
-            onKeyUp={(e) => e.stopPropagation()}
-            onKeyPress={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onMouseUp={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 28px', fontSize: 14, lineHeight: 1.85, color: '#2a2a3e', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word', cursor: 'text' }}
-          />
+          {/* Mockup: sandboxed iframe */}
+          {isMockup ? (
+            <iframe
+              srcDoc={html || '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#888">No content generated</body></html>'}
+              sandbox="allow-scripts"
+              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ flex: 1, border: 'none', width: '100%', minHeight: 480, display: 'block' }}
+            />
+          ) : (
+            /* Editable body for doc type */
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck={false}
+              onKeyDown={(e) => e.stopPropagation()}
+              onKeyUp={(e) => e.stopPropagation()}
+              onKeyPress={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 28px', fontSize: 14, lineHeight: 1.85, color: '#2a2a3e', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word', cursor: 'text' }}
+            />
+          )}
         </div>
       )}
 
@@ -197,8 +213,13 @@ export function DeliverableNode({ data }: { data: DeliverableNodeData }) {
         onClick={() => { if (!isDimmed) isExpanded ? onCollapse() : onExpand(); }}
       >
         <div className="flex items-center gap-1.5 mb-1">
-          <FileText className="w-3 h-3" style={{ color }} />
-          <span className="text-[9px] font-bold tracking-[0.06em] uppercase" style={{ color }}>Doc</span>
+          {isMockup
+            ? <Globe className="w-3 h-3" style={{ color }} />
+            : <FileText className="w-3 h-3" style={{ color }} />
+          }
+          <span className="text-[9px] font-bold tracking-[0.06em] uppercase" style={{ color }}>
+            {isMockup ? 'Site' : 'Doc'}
+          </span>
         </div>
         <span className="text-[12px] font-medium text-[#1a1a2e] text-center leading-[1.3]">{title}</span>
       </div>

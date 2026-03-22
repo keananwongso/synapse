@@ -1,4 +1,4 @@
-// Physics engine for node clustering and drift effect
+// Physics engine for node clustering and Synapse canvas
 
 import { Node, Connection } from './types';
 import { PHYSICS_CONSTANTS } from './constants';

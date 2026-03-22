@@ -56,7 +56,7 @@ export function InputBar({
           'shadow-lg shadow-black/5',
         )}>
           <textarea
-            id="drift-input"
+            id="synapse-input"
             placeholder={placeholder}
             ref={textareaRef}
             value={inputValue}

@@ -1,4 +1,4 @@
-// Physics tuning constants for the drift effect
+// Physics tuning constants for the Synapse canvas
 export const PHYSICS_CONSTANTS = {
   SPRING_STRENGTH: 0.003,       // How strongly connected nodes attract
   SPRING_LENGTH: 160,           // Target distance between connected nodes

@@ -1,4 +1,4 @@
-# Drift — Multi-Agent Spatial Canvas
+# Synapse — Multi-Agent Spatial Canvas
 
 > A spatial canvas where each branch is powered by a dedicated Fetch.ai agent. Gemini orchestrates, agents execute in parallel, results appear as visual nodes.
 

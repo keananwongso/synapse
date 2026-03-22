@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Drift — Multi-Agent System (Fetch.ai uAgents)
+Synapse — Multi-Agent System (Fetch.ai uAgents)
 
 Architecture:
   Frontend creates task in Supabase
@@ -54,12 +54,12 @@ class ResultMessage(Model):
 # ──────────────────────────────────────────────
 # Agent Seeds & Address Resolution
 # ──────────────────────────────────────────────
-ORCHESTRATOR_SEED = os.getenv("ORCHESTRATOR_SEED", "drift_orchestrator_seed_001")
-BRAINSTORM_SEED = os.getenv("BRAINSTORM_SEED", "drift_brainstorm_seed_001")
-RESEARCH_SEED = os.getenv("RESEARCH_SEED", "drift_research_seed_001")
-PLANNER_SEED = os.getenv("PLANNER_SEED", "drift_planner_seed_001")
-WRITER_SEED = os.getenv("WRITER_SEED", "drift_writer_seed_001")
-MOCKUP_SEED = os.getenv("MOCKUP_SEED", "drift_mockup_seed_001")
+ORCHESTRATOR_SEED = os.getenv("ORCHESTRATOR_SEED", "synapse_orchestrator_seed_001")
+BRAINSTORM_SEED = os.getenv("BRAINSTORM_SEED", "synapse_brainstorm_seed_001")
+RESEARCH_SEED = os.getenv("RESEARCH_SEED", "synapse_research_seed_001")
+PLANNER_SEED = os.getenv("PLANNER_SEED", "synapse_planner_seed_001")
+WRITER_SEED = os.getenv("WRITER_SEED", "synapse_writer_seed_001")
+MOCKUP_SEED = os.getenv("MOCKUP_SEED", "synapse_mockup_seed_001")
 
 # Derive addresses from seeds so orchestrator knows where to send
 BRAINSTORM_ADDRESS = Identity.from_seed(BRAINSTORM_SEED, 0).address
@@ -80,12 +80,12 @@ AGENT_ROUTES = {
 # ──────────────────────────────────────────────
 # Create Agents
 # ──────────────────────────────────────────────
-orchestrator = Agent(name="drift_orchestrator", seed=ORCHESTRATOR_SEED, port=8000)
-brainstorm_agent = Agent(name="drift_brainstorm", seed=BRAINSTORM_SEED, port=8001)
-research_agent = Agent(name="drift_researcher", seed=RESEARCH_SEED, port=8002)
-planner_agent = Agent(name="drift_planner", seed=PLANNER_SEED, port=8003)
-writer_agent = Agent(name="drift_writer", seed=WRITER_SEED, port=8004)
-mockup_agent = Agent(name="drift_mockup", seed=MOCKUP_SEED, port=8005)
+orchestrator = Agent(name="synapse_orchestrator", seed=ORCHESTRATOR_SEED, port=8000)
+brainstorm_agent = Agent(name="synapse_brainstorm", seed=BRAINSTORM_SEED, port=8001)
+research_agent = Agent(name="synapse_researcher", seed=RESEARCH_SEED, port=8002)
+planner_agent = Agent(name="synapse_planner", seed=PLANNER_SEED, port=8003)
+writer_agent = Agent(name="synapse_writer", seed=WRITER_SEED, port=8004)
+mockup_agent = Agent(name="synapse_mockup", seed=MOCKUP_SEED, port=8005)
 
 # ──────────────────────────────────────────────
 # Gemini Helper
@@ -431,7 +431,7 @@ Rules:
 # RUN ALL AGENTS VIA BUREAU
 # ══════════════════════════════════════════════
 if __name__ == "__main__":
-    print("🚀 Drift Multi-Agent System")
+    print("🚀 Synapse Multi-Agent System")
     print(f"   Orchestrator : {orchestrator.address}")
     print(f"   Brainstorm   : {brainstorm_agent.address}")
     print(f"   Research     : {research_agent.address}")
