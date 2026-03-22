@@ -6,7 +6,7 @@ Synapse is a spatial canvas where AI agents autonomously break down your ideas i
 
 Built for **produHacks 2025** | **Fetch.ai sponsor prize track**
 
-## 🤖 Live Fetch.ai Agents on Agentverse
+## Live Fetch.ai Agents on Agentverse
 
 Both agents are deployed and running on [Agentverse](https://agentverse.ai):
 
@@ -31,7 +31,7 @@ Orchestrator writes results → Supabase agent_results
 Canvas renders new nodes
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Install Dependencies
 
@@ -69,7 +69,7 @@ python agent.py
 
 Requires Python 3.12 and the env vars in `agent/.env`.
 
-## ✨ Features
+## Features
 
 - **Spatial Canvas** — Infinite pan/zoom canvas powered by React Flow
 - **Multi-Agent Branching** — AI breaks your idea into 4-5 parallel branches, each handled by a dedicated Fetch.ai agent with its own persona and expertise
@@ -80,7 +80,7 @@ Requires Python 3.12 and the env vars in `agent/.env`.
 - **Smooth Morph Transition** — Homepage input pill animates and morphs directly into the canvas center capsule — no page reload
 - **Demo Mode** — Typing "Start a student club at UBC" instantly loads 5 hardcoded UBC-specific branches (AMS Requirements, Campus Operations, Club Identity, Financial Strategy, Member Recruitment) for a deterministic demo experience
 
-## 🏗 Architecture
+## Architecture
 
 ```
 User types idea on homepage
@@ -111,7 +111,7 @@ Brainstorm / Research / Planner / Writer / Mockup agents
 Results → Supabase agent_results → Realtime → Canvas
 ```
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Frontend:** Next.js 15, React 19, TypeScript, Tailwind CSS v4
 - **Canvas:** React Flow with custom node types
@@ -120,7 +120,7 @@ Results → Supabase agent_results → Realtime → Canvas
 - **Database:** Supabase (Postgres + Realtime)
 - **Deployment:** Vercel (frontend) + Agentverse (agents)
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 drift/
@@ -146,7 +146,7 @@ drift/
     └── .env                        # Agent environment variables
 ```
 
-## 🔑 Environment Variables
+## Environment Variables
 
 ### `.env.local` (Next.js)
 ```
@@ -170,7 +170,7 @@ SUPABASE_URL=...          # Orchestrator only
 SUPABASE_SERVICE_KEY=...  # Orchestrator only
 ```
 
-## 🤖 Fetch.ai Agent Roster
+## Fetch.ai Agent Roster
 
 | Agent | Port (local) | Triggered When | Output Type |
 |-------|-------------|----------------|-------------|
@@ -181,15 +181,3 @@ SUPABASE_SERVICE_KEY=...  # Orchestrator only
 | `synapse_writer` | 8004 | Need drafts/docs | `document` node |
 | `synapse_mockup` | 8005 | Need UI/slides | `mockup` iframe node |
 
-### Why Fetch.ai (not just API calls)
-
-- Agents communicate via `ctx.send()` — native Fetch.ai agent messaging protocol
-- Agents are registered on Agentverse and visible to anyone with the address
-- True multi-agent: orchestrator dispatches, sub-agents process in parallel, results flow back
-- Agents run independently — the orchestrator doesn't know *how* sub-agents work, only their address
-
-## 🙏 Credits
-
-- Built for produHacks 2025
-- Powered by Google Gemini + Fetch.ai uAgents
-- Canvas built with React Flow
