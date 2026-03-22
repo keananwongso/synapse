@@ -16,6 +16,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { CenterNode } from './nodes/CenterNode';
 import { BranchNode } from './nodes/BranchNode';
+import { NoteNode } from './nodes/NoteNode';
 
 interface Branch {
   id: string;
@@ -40,9 +41,19 @@ interface SynapseCanvasProps {
 const nodeTypes = {
   center: CenterNode,
   branch: BranchNode,
+  note: NoteNode,
 };
 
 const EDGE_STYLE = { stroke: '#C8C4BC', strokeWidth: 1.5, strokeDasharray: '6 4' };
+
+// Accent dot colors — richer tones, used as small dots on white cards
+const BRANCH_COLORS = [
+  '#9B8EC4', // soft violet
+  '#7BA99A', // sage teal
+  '#C4956A', // warm amber
+  '#7A9BBF', // dusty blue
+  '#B07A8A', // muted rose
+];
 
 function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -109,6 +120,8 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
 
   // Handle center node expand
   const handleCenterExpand = useCallback(() => {
+    // Collapse any expanded branch first
+    setExpandedNodeId(null);
     reactFlowInstance.setCenter(0, 0, { duration: 400, zoom: 1 });
     setTimeout(() => setCenterExpanded(true), 100);
   }, [reactFlowInstance]);
@@ -122,7 +135,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
     const centerNode: Node = {
       id: 'center',
       type: 'center',
-      position: { x: -95, y: -29 }, // Offset so pill is centered at origin
+      position: { x: -70, y: -24 }, // Offset so 140x48 pill is centered at origin
       draggable: false,
       selectable: false,
       deletable: false,
@@ -162,6 +175,8 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
       const x = Math.cos(angle) * 400;
       const y = Math.sin(angle) * 320;
 
+      const color = BRANCH_COLORS[index % BRANCH_COLORS.length];
+
       newNodes.push({
         id: branch.id,
         type: 'branch',
@@ -169,7 +184,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         data: {
           label: branch.label,
           description: branch.description,
-          color: branch.color,
+          color,
           agentPersonality: branch.agentPersonality,
           rootIdea: idea,
           isExpanded: false,
@@ -231,11 +246,54 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
     );
   }, [expandedNodeId, setNodes, handleBranchExpand]);
 
-  // Click background to collapse everything
-  const onPaneClick = useCallback(() => {
+  // Handle note text change
+  const handleNoteTextChange = useCallback((nodeId: string, text: string) => {
+    setNodes(nds => nds.map(n =>
+      n.id === nodeId ? { ...n, data: { ...n.data, text } } : n
+    ));
+  }, [setNodes]);
+
+  // Double-click canvas pane to add a note
+  const lastPaneClickRef = useRef<number>(0);
+  const lastPaneClickPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const onPaneClickWithDoubleDetect = useCallback((event: React.MouseEvent) => {
+    // Single-click: collapse expanded nodes
     if (expandedNodeId) setExpandedNodeId(null);
     if (centerExpanded) setCenterExpanded(false);
-  }, [expandedNodeId, centerExpanded]);
+
+    const now = Date.now();
+    const timeDiff = now - lastPaneClickRef.current;
+    const posDiff = Math.abs(event.clientX - lastPaneClickPosRef.current.x) + Math.abs(event.clientY - lastPaneClickPosRef.current.y);
+
+    if (timeDiff < 400 && posDiff < 10) {
+      // Double-click detected — add note
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      const noteId = `note-${Date.now()}`;
+      const newNote: Node = {
+        id: noteId,
+        type: 'note',
+        position,
+        data: {
+          text: '',
+          onTextChange: handleNoteTextChange,
+          nodeId: noteId,
+        },
+      };
+
+      setNodes(prev => [...prev, newNote]);
+      lastPaneClickRef.current = 0; // Reset to prevent triple-click
+    } else {
+      lastPaneClickRef.current = now;
+      lastPaneClickPosRef.current = { x: event.clientX, y: event.clientY };
+    }
+  }, [expandedNodeId, centerExpanded, reactFlowInstance, setNodes, handleNoteTextChange]);
+
+  // (pane click + double-click detection is handled above in onPaneClickWithDoubleDetect)
 
   return (
     <div className="w-full h-full">
@@ -260,9 +318,9 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onPaneClick={onPaneClick}
+        onPaneClick={onPaneClickWithDoubleDetect}
         nodeTypes={nodeTypes}
-        defaultViewport={{ x: window.innerWidth / 2 - 95, y: window.innerHeight / 2 - 29, zoom: 0.75 }}
+        defaultViewport={{ x: window.innerWidth / 2 - 70, y: window.innerHeight / 2 - 24, zoom: 0.75 }}
         nodesDraggable={!expandedNodeId && !centerExpanded}
         nodesConnectable={false}
         elementsSelectable={false}
@@ -275,7 +333,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         <Controls showInteractive={false} />
         <MiniMap
           nodeStrokeWidth={2}
-          nodeColor={(n) => n.data?.color || '#fff'}
+          nodeColor={(n) => n.data?.color || '#E8E4DC'}
           maskColor="rgba(245,244,240,0.7)"
         />
       </ReactFlow>

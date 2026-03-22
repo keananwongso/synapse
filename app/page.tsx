@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ArrowUp } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const SynapseCanvas = dynamic(() => import('@/components/SynapseCanvas'), { ssr: false });
@@ -17,10 +17,10 @@ interface Branch {
 }
 
 const SUGGESTIONS = [
-  { emoji: '🎉', text: 'Birthday party', bg: '#dce8d8', border: '#c5d9bf', hoverBorder: '#8aba7a' },
-  { emoji: '🚀', text: 'Startup launch', bg: '#e2dced', border: '#d1c9e0', hoverBorder: '#a893c9' },
-  { emoji: '📝', text: 'Thesis writing', bg: '#f0e0d0', border: '#e6d2be', hoverBorder: '#d4a87a' },
-  { emoji: '🎵', text: 'Music festival', bg: '#d5e5e8', border: '#c0d8dc', hoverBorder: '#7fbbc4' },
+  { text: 'Birthday party', bg: '#f3f0eb' },
+  { text: 'Startup launch', bg: '#eeecf3' },
+  { text: 'Thesis writing', bg: '#f3efe9' },
+  { text: 'Music festival', bg: '#ebf0f2' },
 ];
 
 export default function SynapsePage() {
@@ -77,112 +77,93 @@ export default function SynapsePage() {
   // ─── HOMEPAGE ───
   if (phase === 'homepage' || phase === 'collapsing') {
     return (
-      <div className="h-screen w-screen dot-grid flex flex-col items-center justify-center relative overflow-hidden">
-          {/* Radial glow */}
-          <div
-            className="absolute inset-0 pointer-events-none entrance-glow"
-            style={{
-              background: 'radial-gradient(ellipse 800px 500px at 50% 65%, rgba(200,230,192,0.4) 0%, transparent 65%)',
-            }}
-          />
+      <div className="h-screen w-screen dot-grid flex flex-col items-center relative overflow-hidden" style={{ paddingTop: '18vh' }}>
+        {/* Content */}
+        <div
+          className="flex flex-col items-center relative z-[1] px-6 w-full"
+          style={{
+            opacity: phase === 'collapsing' ? 0 : undefined,
+            transform: phase === 'collapsing' ? 'translateY(-30px) scale(0.98)' : undefined,
+            transition: phase === 'collapsing' ? 'all 0.5s cubic-bezier(0.4,0,0.2,1)' : undefined,
+          }}
+        >
+          {/* Heading */}
+          <div className="entrance-h1">
+            <h1 className="text-[64px] font-semibold text-[#1a1a2e] text-center leading-[1.1] tracking-[-0.035em]">
+              Your thoughts,<br />beautifully untangled
+            </h1>
+          </div>
 
-          {/* Content container */}
+          {/* Subtitle */}
+          <div className="entrance-subtitle" style={{ marginTop: 24 }}>
+            <p className="text-[17px] text-[#aaa] text-center">
+              Type an idea. AI agents will break it down and brainstorm with you.
+            </p>
+          </div>
+
+          {/* Input */}
           <div
-            className="flex flex-col items-center relative z-[1]"
+            className="entrance-chatbox w-full max-w-[560px]"
             style={{
-              opacity: phase === 'collapsing' ? 0 : undefined,
-              transform: phase === 'collapsing' ? 'translateY(-20px)' : undefined,
-              transition: phase === 'collapsing' ? 'all 0.5s ease' : undefined,
+              marginTop: 48,
+              ...(phase === 'collapsing' ? { transform: 'scale(0.9)', opacity: 0, transition: 'all 0.3s ease' } : {}),
             }}
           >
-            {/* Badge */}
-            <div className="entrance-badge">
-              <div className="mb-5 px-3.5 py-1.5 rounded-full bg-[#f0eeea] text-[11px] text-[#888780] font-medium tracking-wide">
-                ✦ AI-powered brainstorming
-              </div>
-            </div>
-
-            {/* h1 */}
-            <div className="entrance-h1">
-              <h1 className="text-[36px] font-medium text-[#1a1a2e] text-center leading-[1.2]" style={{ letterSpacing: '-0.5px' }}>
-                Your thoughts,<br />beautifully untangled
-              </h1>
-            </div>
-
-            {/* Subtitle */}
-            <div className="entrance-subtitle">
-              <p className="text-[15px] text-[#888780] mt-4 text-center">
-                Type an idea. Watch it grow into something actionable.
-              </p>
-            </div>
-
-            {/* Chatbox */}
             <div
-              className="mt-12 w-full flex justify-center entrance-chatbox"
-              style={phase === 'collapsing' ? { transform: 'scale(0.1)', opacity: 0, transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)' } : undefined}
+              className="relative rounded-full"
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid rgba(0,0,0,0.07)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.04), 0 8px 28px rgba(0,0,0,0.07)',
+              }}
             >
-              <div
-                className="relative rounded-[18px] shadow-[0_2px_12px_rgba(0,0,0,0.05)] focus-within:shadow-[0_0_0_3px_rgba(176,206,184,0.18)] transition-shadow duration-200"
-                style={{
-                  width: '640px',
-                  maxWidth: 'calc(100vw - 8rem)',
-                  backgroundColor: '#fdfcfa',
-                  border: '1px solid #e0ddd8',
-                  borderLeft: '3px solid #4a9e6b',
+              <input
+                ref={inputRef}
+                type="text"
+                value={idea}
+                onChange={(e) => setIdea(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); handleSubmit(); }
                 }}
+                placeholder="What are you working on?"
+                className="w-full bg-transparent text-[16px] text-[#1a1a2e] placeholder:text-[#c0bfbb] outline-none rounded-full"
+                style={{ height: '60px', paddingLeft: '32px', paddingRight: '64px' }}
+                disabled={phase === 'collapsing'}
+              />
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!idea.trim() || phase === 'collapsing'}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-[#1a1a2e] flex items-center justify-center transition-all disabled:opacity-20 hover:opacity-75"
               >
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={idea}
-                  onChange={(e) => setIdea(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); handleSubmit(); }
-                  }}
-                  placeholder="What are you working on?"
-                  className="w-full bg-transparent pl-5 pr-16 text-[16px] text-[#1a1a2e] placeholder:text-[#B4B2A9] outline-none rounded-[18px]"
-                  style={{ height: '56px', lineHeight: '56px' }}
-                  disabled={phase === 'collapsing'}
-                />
-                <button
-                  onClick={handleSubmit}
-                  disabled={!idea.trim() || phase === 'collapsing'}
-                  className="absolute right-0 top-0 w-14 h-14 rounded-r-[18px] bg-[#1a1a2e] flex items-center justify-center transition-opacity disabled:opacity-30 hover:opacity-80"
-                >
-                  <ArrowUp className="w-5 h-5 text-white" />
-                </button>
-              </div>
-            </div>
-
-            {/* Chips */}
-            <div className="mt-6 flex flex-wrap justify-center gap-2.5">
-              {SUGGESTIONS.map((s, i) => (
-                <div key={s.text} className={`entrance-chip-${i}`}>
-                  <button
-                    onClick={() => handleChipClick(s.text)}
-                    className="flex items-center gap-2 rounded-full text-[12px] text-[#555] hover:text-[#1a1a2e] transition-all"
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: s.bg,
-                      border: `1px solid ${s.border}`,
-                    }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = s.hoverBorder; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = s.border; }}
-                  >
-                    <span>{s.emoji}</span>
-                    <span>{s.text}</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Footer hint */}
-            <div className="entrance-footer">
-              <p className="mt-8 text-[12px] text-[#b4b2a9]">
-                Press Enter to branch your idea into focused AI agents
-              </p>
+                <ArrowRight className="w-4 h-4 text-white" />
+              </button>
             </div>
           </div>
+
+          {/* Chips */}
+          <div className="flex flex-wrap justify-center gap-2" style={{ marginTop: 20 }}>
+            {SUGGESTIONS.map((s, i) => (
+              <div key={s.text} className={`entrance-chip-${i}`}>
+                <button
+                  type="button"
+                  onClick={() => handleChipClick(s.text)}
+                  className="rounded-full text-[13px] text-[#888] hover:text-[#444] transition-colors"
+                  style={{ padding: '8px 18px', backgroundColor: s.bg }}
+                >
+                  {s.text}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div className="entrance-footer" style={{ marginTop: 40 }}>
+            <p className="text-[12px] text-[#ccc] tracking-wide">
+              Press Enter to start
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

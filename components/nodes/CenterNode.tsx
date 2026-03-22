@@ -68,15 +68,19 @@ export function CenterNode({ data }: { data: CenterNodeData }) {
   // ─── COLLAPSED: pill + floating messages ───
   if (!isExpanded) {
     return (
-      <div className="relative" style={{ width: 190 }}>
-        {/* Floating AI messages above — plain text, no box */}
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 flex flex-col items-center gap-1.5 w-[260px] pointer-events-none">
+      <div className="relative" style={{ width: 140, height: 48 }}>
+        {/* Floating AI messages above — plain text, above edges */}
+        <div
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 flex flex-col items-center gap-1.5 w-[280px] pointer-events-none"
+          style={{ zIndex: 10 }}
+        >
           {floatingMessages.slice(-2).map((msg, i) => (
             <p
               key={msg.id}
-              className="text-[12.5px] leading-[1.5] text-[#555250] text-center"
+              className="text-[12px] leading-[1.5] text-[#777] text-center"
               style={{
                 animation: `floatIn 0.4s cubic-bezier(0.16,1,0.3,1) ${i * 80}ms both`,
+                textShadow: '0 1px 8px rgba(245,244,240,0.9), 0 0 4px rgba(245,244,240,1)',
               }}
             >
               {msg.text}
@@ -84,15 +88,21 @@ export function CenterNode({ data }: { data: CenterNodeData }) {
           ))}
         </div>
 
-        {/* The pill itself — Handles live here so edges connect to the pill */}
+        {/* The pill */}
         <div
-          className={`relative flex items-center justify-center bg-white border-[1.5px] border-[#d0cdc6] rounded-full cursor-pointer hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] transition-shadow ${isLoading ? 'pulse-loading' : ''}`}
-          style={{ width: 190, height: 58 }}
+          className={`relative flex items-center justify-center rounded-full cursor-pointer ${isLoading ? 'pulse-loading' : ''}`}
+          style={{
+            width: 140,
+            height: 48,
+            backgroundColor: '#1a1a2e',
+            boxShadow: '0 2px 8px rgba(26,26,46,0.2), 0 8px 24px rgba(26,26,46,0.15)',
+            transition: 'box-shadow 0.2s ease, transform 0.15s ease',
+          }}
+          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.boxShadow = '0 4px 12px rgba(26,26,46,0.3), 0 12px 32px rgba(26,26,46,0.2)'; el.style.transform = 'scale(1.03)'; }}
+          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.boxShadow = '0 2px 8px rgba(26,26,46,0.2), 0 8px 24px rgba(26,26,46,0.15)'; el.style.transform = 'scale(1)'; }}
           onClick={() => onExpand()}
         >
-          <span className="text-[14px] font-medium text-[#1a1a2e] text-center truncate max-w-[150px]">
-            {label}
-          </span>
+          <span className="text-[13px] font-medium text-white/90 tracking-[-0.1px]">Chat</span>
           <Handle type="source" position={Position.Top} className="!bg-transparent !border-none !w-0 !h-0" style={{ top: '50%' }} />
           <Handle type="source" position={Position.Bottom} className="!bg-transparent !border-none !w-0 !h-0" style={{ top: '50%' }} />
           <Handle type="source" position={Position.Left} className="!bg-transparent !border-none !w-0 !h-0" style={{ top: '50%' }} />
@@ -110,9 +120,9 @@ export function CenterNode({ data }: { data: CenterNodeData }) {
         width: 400,
         height: 360,
         borderRadius: 20,
-        backgroundColor: '#fdfcfa',
-        border: '1.5px solid #d0cdc6',
-        boxShadow: '0 12px 48px rgba(0,0,0,0.12)',
+        backgroundColor: '#ffffff',
+        border: '1px solid rgba(0,0,0,0.08)',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.04), 0 16px 48px rgba(0,0,0,0.13), 0 4px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
         position: 'relative',
       }}

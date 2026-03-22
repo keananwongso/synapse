@@ -48,7 +48,7 @@ export function BranchNode({ data }: { data: BranchNodeData }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const accentColor = darkenColor(color, 0.25);
+  const accentColor = darkenColor(color, 0.35);
 
   // Spawn animation delay
   useEffect(() => {
@@ -152,25 +152,35 @@ export function BranchNode({ data }: { data: BranchNodeData }) {
         )}
 
         <div
-          className="node-spawn flex items-center justify-center rounded-full cursor-pointer transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,0.1)]"
+          className="node-spawn flex flex-col cursor-pointer relative"
           style={{
-            height: 48,
-            paddingLeft: 20,
-            paddingRight: 20,
-            backgroundColor: color,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
-            opacity: isDimmed ? 0.35 : 1,
+            minWidth: 140,
+            padding: '10px 14px',
+            background: 'linear-gradient(160deg, #ffffff 0%, #faf9f7 100%)',
+            border: `1.5px dashed ${color}`,
+            borderRadius: 14,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)',
+            opacity: isDimmed ? 0.25 : 1,
             pointerEvents: isDimmed ? 'none' : 'auto',
-            transition: 'opacity 0.3s ease, box-shadow 0.2s ease',
+            transition: 'opacity 0.3s ease, box-shadow 0.2s ease, border-color 0.2s ease',
           }}
-          onClick={() => {
-            if (!isDimmed) onExpand();
-          }}
+          onMouseEnter={e => { if (!isDimmed) { (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 6px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.1)'; (e.currentTarget as HTMLElement).style.borderColor = accentColor; } }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)'; (e.currentTarget as HTMLElement).style.borderColor = color; }}
+          onClick={() => { if (!isDimmed) onExpand(); }}
         >
-          {agentStatus === 'thinking' && (
-            <div className="w-2 h-2 rounded-full mr-2 animate-pulse" style={{ backgroundColor: accentColor }} />
-          )}
-          <span className="text-[13px] font-medium text-[#1a1a2e] whitespace-nowrap">{label}</span>
+          {/* AGENT badge */}
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span
+              className="text-[9px] font-bold tracking-[0.08em] uppercase px-1.5 py-0.5 rounded"
+              style={{ backgroundColor: color, color: accentColor }}
+            >
+              Agent
+            </span>
+            {agentStatus === 'thinking' && (
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
+            )}
+          </div>
+          <span className="text-[13px] font-semibold text-[#1a1a2e] whitespace-nowrap tracking-[-0.1px]">{label}</span>
         </div>
         {handles}
       </div>
@@ -183,9 +193,10 @@ export function BranchNode({ data }: { data: BranchNodeData }) {
       style={{
         width: 380,
         height: 340,
-        borderRadius: 20,
-        backgroundColor: color,
-        boxShadow: '0 12px 48px rgba(0,0,0,0.12)',
+        borderRadius: 16,
+        backgroundColor: '#ffffff',
+        border: `1.5px dashed ${color}`,
+        boxShadow: '0 2px 6px rgba(0,0,0,0.04), 0 16px 48px rgba(0,0,0,0.13), 0 4px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
         position: 'relative',
         zIndex: 50,
@@ -203,10 +214,15 @@ export function BranchNode({ data }: { data: BranchNodeData }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-3.5 py-2.5 border-b" style={{ borderColor: accentColor + '25' }}>
+        <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-black/[0.06]">
           <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: accentColor }} />
-            <span className="text-[13px] font-medium text-[#1a1a2e]">{label}</span>
+            <span
+              className="text-[9px] font-bold tracking-[0.08em] uppercase px-1.5 py-0.5 rounded"
+              style={{ backgroundColor: color, color: accentColor }}
+            >
+              Agent
+            </span>
+            <span className="text-[13px] font-semibold text-[#1a1a2e] tracking-[-0.1px]">{label}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <button
