@@ -17,10 +17,9 @@ interface Branch {
 }
 
 const SUGGESTIONS = [
-  { text: 'Birthday party', bg: '#f3f0eb' },
-  { text: 'Startup launch', bg: '#eeecf3' },
-  { text: 'Thesis writing', bg: '#f3efe9' },
-  { text: 'Music festival', bg: '#ebf0f2' },
+  { text: 'Start a student club at UBC' },
+  { text: 'Plan a hackathon' },
+  { text: 'Ace final exam season' },
 ];
 
 export default function SynapsePage() {
@@ -156,22 +155,20 @@ export default function SynapsePage() {
           className="absolute inset-0 flex flex-col items-center px-6 w-full"
           style={{ paddingTop: '18vh', zIndex: 2 }}
         >
-          {/* Heading */}
+          {/* Tagline + description on top */}
           <div className="entrance-h1">
-            <h1 className="text-[64px] font-semibold text-[#1a1a2e] text-center leading-[1.1] tracking-[-0.035em]">
-              Your thoughts,<br />beautifully untangled
+            <h1 className="text-[56px] font-bold text-[#1a1a2e] text-center leading-[1] tracking-[-0.04em]">
+              <span style={{ color: '#7B6BA8' }}>Reimagine</span> thinking
             </h1>
           </div>
-
-          {/* Subtitle */}
-          <div className="entrance-subtitle" style={{ marginTop: 24 }}>
-            <p className="text-[17px] text-[#aaa] text-center">
-              Type an idea. AI agents will break it down and brainstorm with you.
+          <div className="entrance-subtitle" style={{ marginTop: 10 }}>
+            <p className="text-[14px] text-center" style={{ color: '#1a1a2e', opacity: 0.4 }}>
+              Type an idea. AI agents brainstorm, research, and execute in real time.
             </p>
           </div>
 
           {/* Input pill */}
-          <div className="entrance-chatbox w-full max-w-[560px]" style={{ marginTop: 48 }}>
+          <div className="entrance-chatbox w-full max-w-[560px]" style={{ marginTop: 64 }}>
             <div
               className="relative rounded-full"
               style={{
@@ -210,8 +207,10 @@ export default function SynapsePage() {
                 <button
                   type="button"
                   onClick={() => handleChipClick(s.text)}
-                  className="rounded-full text-[13px] text-[#888] hover:text-[#444] transition-colors"
-                  style={{ padding: '8px 18px', backgroundColor: s.bg }}
+                  className="rounded-full text-[13px] text-[#555] hover:text-[#222] transition-all"
+                  style={{ padding: '8px 18px', backgroundColor: 'rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.06)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.04)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
                   {s.text}
                 </button>
@@ -219,12 +218,13 @@ export default function SynapsePage() {
             ))}
           </div>
 
-          {/* Footer */}
-          <div className="entrance-footer" style={{ marginTop: 40 }}>
-            <p className="text-[12px] text-[#ccc] tracking-wide">
-              Press Enter to start
+          {/* Synapse — subtle footer branding */}
+          <div style={{ position: 'absolute', bottom: 80, left: 0, right: 0 }}>
+            <p className="text-[28px] font-semibold text-[#1a1a2e] text-center tracking-[-0.03em]" style={{ opacity: 0.12 }}>
+              Synapse.
             </p>
           </div>
+
         </div>
       )}
 
@@ -234,7 +234,7 @@ export default function SynapsePage() {
           style={{
             position: 'fixed',
             left: '50%',
-            top: morphed ? '50%' : 'calc(18vh + 168px)',
+            top: morphed ? '50%' : 'calc(18vh + 120px)',
             transform: morphed ? 'translate(-50%, -50%)' : 'translateX(-50%)',
             zIndex: 30,
             pointerEvents: 'none',

@@ -22,6 +22,7 @@ import { CenterNode } from './nodes/CenterNode';
 import { BranchNode } from './nodes/BranchNode';
 import { NoteNode } from './nodes/NoteNode';
 import { DeliverableNode } from './nodes/DeliverableNode';
+import { MasterPlanNode } from './nodes/MasterPlanNode';
 
 
 interface ChatMessage {
@@ -299,6 +300,7 @@ const nodeTypes = {
   deliverable: DeliverableNode,
   skeleton: SkeletonNode,
   panel: PanelNode,
+  masterplan: MasterPlanNode,
 };
 
 const edgeTypes = {
@@ -754,46 +756,134 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
     restoreNodes();
   }, [restoreNodes]);
 
+  // Spawn master plan node on the canvas
+  const spawnMasterPlan = useCallback((planData: { title: string; weeks: { week: string; tasks: string[] }[] }) => {
+    const planNodeId = `masterplan-${Date.now()}`;
+    const planNode: Node = {
+      id: planNodeId,
+      type: 'masterplan',
+      position: { x: -190, y: 350 }, // Below center node
+      data: {
+        title: planData.title,
+        weeks: planData.weeks,
+        color: '#1a1a2e',
+      },
+    };
+
+    const planEdge: Edge = {
+      id: `e-center-${planNodeId}`,
+      source: 'center',
+      target: planNodeId,
+      type: 'straight',
+      style: { stroke: '#1a1a2e', strokeWidth: 2, strokeDasharray: undefined },
+    };
+
+    setNodes(prev => [...prev, planNode]);
+    setEdges(prev => [...prev, planEdge]);
+
+    // Fit view to show the new plan node
+    setTimeout(() => {
+      reactFlowInstance.fitView({ padding: 0.2, duration: 700, minZoom: 0.35, maxZoom: 0.8 });
+    }, 400);
+  }, [setNodes, setEdges, reactFlowInstance]);
+
   // Handle orchestrator chat messages
   const handleCenterSendMessage = useCallback(async (text: string) => {
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text };
     setCenterMessages(prev => [...prev, userMsg]);
     setIsCenterChatLoading(true);
-    
+
     // Instantly pop up the chat panel and push nodes aside while we wait
     setResponseCard('thinking...');
     setTimeout(() => pushNodesForCard(), 50);
 
+    // Detect if user is asking for an action plan / synthesis
+    const lower = text.toLowerCase();
+    const isPlanRequest = /\b(action plan|plan|next steps|to.?do|checklist|what.?should.?i.?do|start.?on.?monday|get.?started|full plan|roadmap|game ?plan)\b/.test(lower);
+
     try {
-      const agentContext = Array.from(agentStates.entries()).map(([id, state]) => {
-        const branch = branches.find(b => b.id === id);
-        return `${branch?.label || id}: ${state.status}${state.deliverables.length > 0 ? ` (${state.deliverables.length} deliverables)` : ''}`;
-      }).join('\n');
+      if (isPlanRequest) {
+        // Gather all deliverables from all agents
+        const allDeliverables: { branch: string; title: string; summary: string; content: string }[] = [];
+        for (const [id, state] of agentStates.entries()) {
+          const branch = branches.find(b => b.id === id);
+          for (const d of state.deliverables) {
+            allDeliverables.push({
+              branch: branch?.label || id,
+              title: d.title,
+              summary: d.summary,
+              content: d.content,
+            });
+          }
+        }
 
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [...centerMessages, userMsg],
-          agentPersonality: `You are the central orchestrator for a brainstorming session about "${idea}". You have visibility into all agents:\n${agentContext}\n\nBe conversational, concise (2-3 sentences). Help the user understand the big picture. When they give new context, suggest which agents/branches might be affected.`,
-          nodeLabel: idea,
-          rootIdea: idea,
-        }),
-      });
+        // Run synthesis + chat reply in parallel
+        const [synthRes, chatRes] = await Promise.all([
+          fetch('/api/synthesize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rootIdea: idea,
+              branches: branches.map(b => b.label),
+              deliverables: allDeliverables,
+            }),
+          }),
+          fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [...centerMessages, userMsg],
+              agentPersonality: `You are the central orchestrator for a brainstorming session about "${idea}". The user just asked for an action plan. You're generating a structured plan from all agents. Respond with something like "Here's your action plan — I've pulled the most important steps from all 5 agents into a week-by-week roadmap." Keep it to 1-2 sentences.`,
+              nodeLabel: idea,
+              rootIdea: idea,
+            }),
+          }),
+        ]);
 
-      if (res.ok) {
-        const { reply } = await res.json();
-        const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'ai', text: reply };
-        setCenterMessages(prev => [...prev, aiMsg]);
-        setResponseCard(reply);
-        setTimeout(() => pushNodesForCard(), 50);
+        if (synthRes.ok) {
+          const planData = await synthRes.json();
+          spawnMasterPlan(planData);
+        }
+
+        if (chatRes.ok) {
+          const { reply } = await chatRes.json();
+          const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'ai', text: reply };
+          setCenterMessages(prev => [...prev, aiMsg]);
+          setResponseCard(reply);
+          setTimeout(() => pushNodesForCard(), 50);
+        }
+      } else {
+        // Normal chat
+        const agentContext = Array.from(agentStates.entries()).map(([id, state]) => {
+          const branch = branches.find(b => b.id === id);
+          return `${branch?.label || id}: ${state.status}${state.deliverables.length > 0 ? ` (${state.deliverables.length} deliverables)` : ''}`;
+        }).join('\n');
+
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [...centerMessages, userMsg],
+            agentPersonality: `You are the central orchestrator for a brainstorming session about "${idea}". You have visibility into all agents:\n${agentContext}\n\nBe conversational, concise (2-3 sentences). Help the user understand the big picture. When they give new context, suggest which agents/branches might be affected.`,
+            nodeLabel: idea,
+            rootIdea: idea,
+          }),
+        });
+
+        if (res.ok) {
+          const { reply } = await res.json();
+          const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'ai', text: reply };
+          setCenterMessages(prev => [...prev, aiMsg]);
+          setResponseCard(reply);
+          setTimeout(() => pushNodesForCard(), 50);
+        }
       }
     } catch (err) {
       console.error('Center chat error:', err);
     } finally {
       setIsCenterChatLoading(false);
     }
-  }, [centerMessages, idea, agentStates, branches, pushNodesForCard]);
+  }, [centerMessages, idea, agentStates, branches, pushNodesForCard, spawnMasterPlan]);
 
   // Handle per-agent chat
   const handleAgentSendMessage = useCallback(async (branchId: string, text: string) => {
