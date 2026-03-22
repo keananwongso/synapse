@@ -30,6 +30,18 @@ body {
   background-color: #f5f4f0 !important;
 }
 
+/* Suppress node selection outline */
+.react-flow__node.selected > * {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.react-flow__node.selected {
+  outline: none !important;
+}
+.react-flow__nodesselection-rect {
+  display: none !important;
+}
+
 .react-flow__edge-path {
   stroke: #d4d0c8 !important;
   stroke-width: 2 !important;
@@ -117,6 +129,12 @@ body {
 @keyframes floatIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Slide-in panel */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 /* Scrollbar */
