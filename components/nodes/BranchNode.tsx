@@ -2,6 +2,7 @@
 
 import { Handle, Position } from 'reactflow';
 import { useState, useEffect } from 'react';
+import { Plus } from 'lucide-react';
 
 interface BranchNodeData {
   label: string;
@@ -11,6 +12,7 @@ interface BranchNodeData {
   rootIdea: string;
   isDimmed: boolean;
   onClickAgent: () => void;
+  onAddNode: () => void;
   spawnDelay: number;
   // Agent thinking state
   agentThinking?: string;
@@ -26,7 +28,7 @@ function darkenColor(hex: string, factor: number = 0.35): string {
 
 export function BranchNode({ data }: { data: BranchNodeData }) {
   const {
-    label, color, isDimmed, onClickAgent, spawnDelay,
+    label, color, isDimmed, onClickAgent, onAddNode, spawnDelay,
     agentThinking, agentStatus = 'idle',
   } = data;
 
@@ -98,6 +100,24 @@ export function BranchNode({ data }: { data: BranchNodeData }) {
           </p>
         )}
       </div>
+      {/* Add node button — below the branch card */}
+      {!isDimmed && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onAddNode(); }}
+          className="absolute left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+          style={{
+            top: 'calc(100% + 6px)',
+            border: '1px solid rgba(0,0,0,0.08)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+            cursor: 'pointer',
+            zIndex: 5,
+          }}
+        >
+          <Plus className="w-3 h-3 text-[#888]" />
+        </button>
+      )}
+
       {/* Floating thinking bubble above the node */}
       {agentStatus === 'thinking' && agentThinking && (
         <div

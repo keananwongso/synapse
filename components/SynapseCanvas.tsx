@@ -512,6 +512,51 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
     setOpenPanelBranchId(prev => prev === branchId ? null : branchId);
   }, []);
 
+  // Handle note text change
+  const handleNoteTextChange = useCallback((nodeId: string, text: string) => {
+    setNodes(nds => nds.map(n =>
+      n.id === nodeId ? { ...n, data: { ...n.data, text } } : n
+    ));
+  }, [setNodes]);
+
+  // Spawn a note node attached to a parent node
+  const spawnNoteFromNode = useCallback((parentId: string) => {
+    const parentNode = nodesRef.current.find(n => n.id === parentId);
+    if (!parentNode) return;
+
+    const px = parentNode.position.x;
+    const py = parentNode.position.y;
+
+    // Place below-right of parent, with some random spread to avoid overlap
+    const offsetX = 60 + Math.random() * 40;
+    const offsetY = 80 + Math.random() * 40;
+    const x = px + offsetX;
+    const y = py + offsetY;
+
+    const noteId = `note-${Date.now()}`;
+    const newNote: Node = {
+      id: noteId,
+      type: 'note',
+      position: { x, y },
+      data: {
+        text: '',
+        onTextChange: handleNoteTextChange,
+        nodeId: noteId,
+      },
+    };
+
+    const newEdge: Edge = {
+      id: `e-${parentId}-${noteId}`,
+      source: parentId,
+      target: noteId,
+      type: 'straight',
+      style: EDGE_STYLE,
+    };
+
+    setNodes(prev => [...prev, newNote]);
+    setEdges(prev => [...prev, newEdge]);
+  }, [handleNoteTextChange, setNodes, setEdges]);
+
   // Create center node on mount + keep it updated
   useEffect(() => {
     const centerNode: Node = {
@@ -534,6 +579,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         isChatLoading: isCenterChatLoading,
         responseCard,
         onDismissResponse: handleDismissResponse,
+        onAddNode: () => spawnNoteFromNode('center'),
       },
       style: { cursor: 'default' },
     };
@@ -542,7 +588,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
       const otherNodes = prev.filter(n => n.id !== 'center');
       return [centerNode, ...otherNodes];
     });
-  }, [idea, isLoading, centerExpanded, floatingMessages, centerMessages, isCenterChatLoading, setNodes, handleCenterExpand, handleCenterCollapse, handleCenterSendMessage, responseCard, handleDismissResponse]);
+  }, [idea, isLoading, centerExpanded, floatingMessages, centerMessages, isCenterChatLoading, setNodes, handleCenterExpand, handleCenterCollapse, handleCenterSendMessage, responseCard, handleDismissResponse, spawnNoteFromNode]);
 
   // Spawn branch nodes when branches arrive
   useEffect(() => {
@@ -572,6 +618,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
           rootIdea: idea,
           isDimmed: false,
           onClickAgent: () => handleAgentClick(branch.id),
+          onAddNode: () => spawnNoteFromNode(branch.id),
           spawnDelay: index * 100,
           agentThinking: undefined,
           agentStatus: 'idle' as const,
@@ -595,7 +642,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         reactFlowInstance.fitView({ padding: 0.25, duration: 700, minZoom: 0.4, maxZoom: 0.85 });
       }, maxSpawnDelay + 300);
     }, 150);
-  }, [branches, idea, setNodes, setEdges, reactFlowInstance, handleAgentClick]);
+  }, [branches, idea, setNodes, setEdges, reactFlowInstance, handleAgentClick, spawnNoteFromNode]);
 
   // Update branch node data when agentStates or expandedNodeId changes
   useEffect(() => {
@@ -609,6 +656,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
               ...node.data,
               isDimmed: !!expandedNodeId && expandedNodeId !== node.id,
               onClickAgent: () => handleAgentClick(node.id),
+              onAddNode: () => spawnNoteFromNode(node.id),
               agentThinking: agentState?.currentThinking,
               agentStatus: agentState?.status || 'idle',
             },
@@ -631,14 +679,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         return node;
       })
     );
-  }, [expandedNodeId, agentStates, setNodes, handleAgentClick, handleDeliverableExpand]);
-
-  // Handle note text change
-  const handleNoteTextChange = useCallback((nodeId: string, text: string) => {
-    setNodes(nds => nds.map(n =>
-      n.id === nodeId ? { ...n, data: { ...n.data, text } } : n
-    ));
-  }, [setNodes]);
+  }, [expandedNodeId, agentStates, setNodes, handleAgentClick, handleDeliverableExpand, spawnNoteFromNode]);
 
   // Double-click canvas pane to add a note
   const lastPaneClickRef = useRef<number>(0);

@@ -2,7 +2,7 @@
 
 import { Handle, Position } from 'reactflow';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Plus } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -22,6 +22,7 @@ interface CenterNodeData {
   isChatLoading: boolean;
   responseCard: string | null;
   onDismissResponse: () => void;
+  onAddNode: () => void;
 }
 
 function formatBold(text: string) {
@@ -128,7 +129,7 @@ export function CenterNode({ data }: { data: CenterNodeData }) {
   const {
     label, isLoading, isExpanded, onExpand, onCollapse,
     floatingMessages, onSendMessage, isChatLoading,
-    responseCard, onDismissResponse,
+    responseCard, onDismissResponse, onAddNode,
   } = data;
 
   const [input, setInput] = useState('');
@@ -283,6 +284,23 @@ export function CenterNode({ data }: { data: CenterNodeData }) {
           </div>
         </div>
       </div>
+
+      {/* Add node button — below the capsule */}
+      {!isExpanded && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onAddNode(); }}
+          className="absolute left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+          style={{
+            top: 'calc(50% + 34px)',
+            border: '1px solid rgba(0,0,0,0.08)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+            cursor: 'pointer',
+          }}
+        >
+          <Plus className="w-3 h-3 text-[#888]" />
+        </button>
+      )}
     </div>
   );
 }
