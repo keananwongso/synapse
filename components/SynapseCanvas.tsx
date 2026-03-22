@@ -9,17 +9,26 @@ import ReactFlow, {
   useEdgesState,
   Node,
   Edge,
+  EdgeProps,
   BackgroundVariant,
   useReactFlow,
   ReactFlowProvider,
+  getStraightPath,
+  Handle,
+  Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { CenterNode } from './nodes/CenterNode';
 import { BranchNode } from './nodes/BranchNode';
 import { NoteNode } from './nodes/NoteNode';
 import { DeliverableNode } from './nodes/DeliverableNode';
-import { AgentDetailPanel } from './AgentDetailPanel';
 
+
+interface ChatMessage {
+  id: string;
+  role: 'ai' | 'user';
+  text: string;
+}
 
 interface Branch {
   id: string;
@@ -50,10 +59,237 @@ interface AgentState {
   deliverables: Deliverable[];
 }
 
+interface OpenPanel {
+  nodeId: string;
+  title: string;
+  summary: string;
+  content: string;
+  html?: string;
+  type: 'doc' | 'mockup';
+  color: string;
+}
+
 interface SynapseCanvasProps {
   idea: string;
   branches: Branch[];
   isLoading: boolean;
+}
+
+function PanelNode({ data }: { data: {
+  title: string;
+  summary: string;
+  content: string;
+  html?: string;
+  type: 'doc' | 'mockup';
+  color: string;
+  onClose: () => void;
+} }) {
+  const { title, summary, content, html, type, color, onClose } = data;
+  const isMockup = type === 'mockup';
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 420, h: 360 });
+  const resizeRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
+
+  useEffect(() => {
+    if (!isMockup && contentRef.current) {
+      contentRef.current.innerHTML = content
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br/>');
+    }
+  }, [content, isMockup]);
+
+  const darken = (hex: string) => {
+    const r = parseInt(hex.slice(1,3), 16);
+    const g = parseInt(hex.slice(3,5), 16);
+    const b = parseInt(hex.slice(5,7), 16);
+    return `rgb(${Math.round(r*0.65)},${Math.round(g*0.65)},${Math.round(b*0.65)})`;
+  };
+  const accent = darken(color);
+
+  // Shared resize handler — pass dx/dy multipliers for each edge/corner
+  const startResize = (e: React.MouseEvent, mx: number, my: number) => {
+    e.stopPropagation();
+    e.preventDefault();
+    resizeRef.current = { startX: e.clientX, startY: e.clientY, startW: size.w, startH: size.h };
+    const onMove = (ev: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const dw = (ev.clientX - resizeRef.current.startX) * mx;
+      const dh = (ev.clientY - resizeRef.current.startY) * my;
+      setSize({
+        w: Math.max(280, resizeRef.current.startW + dw),
+        h: Math.max(180, resizeRef.current.startH + dh),
+      });
+    };
+    const onUp = () => {
+      resizeRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // Header height (~42) + summary (~28 if present) = offset for content area
+  const headerH = 42 + (summary ? 28 : 0);
+  const contentH = Math.max(60, size.h - headerH - 24); // 24 for padding
+
+  return (
+    <div
+      className="node-spawn"
+      style={{
+        width: size.w,
+        height: size.h,
+        borderRadius: 16,
+        backgroundColor: '#fff',
+        border: `1.5px solid ${color}30`,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08), 0 1px 6px rgba(0,0,0,0.04)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+      }}
+    >
+      <Handle type="target" position={Position.Top} className="!bg-transparent !border-none !w-0 !h-0" />
+      <Handle type="target" position={Position.Bottom} className="!bg-transparent !border-none !w-0 !h-0" />
+      <Handle type="target" position={Position.Left} className="!bg-transparent !border-none !w-0 !h-0" />
+      <Handle type="target" position={Position.Right} className="!bg-transparent !border-none !w-0 !h-0" />
+
+      {/* Header */}
+      <div
+        style={{
+          padding: '12px 14px 10px',
+          borderBottom: `1px solid ${color}20`,
+          background: `linear-gradient(135deg, #fff 0%, ${color}08 100%)`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              backgroundColor: color, color: accent,
+              padding: '2px 7px', borderRadius: 6,
+            }}
+          >
+            {isMockup ? 'Site' : 'Doc'}
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>{title}</span>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          style={{
+            width: 24, height: 24, borderRadius: 8,
+            border: 'none', background: 'transparent',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#888780', fontSize: 15, lineHeight: 1,
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Summary */}
+      {summary && (
+        <div style={{ padding: '6px 14px', borderBottom: '1px solid #f0eeea', flexShrink: 0 }}>
+          <p style={{ fontSize: 11, color: '#888780', margin: 0 }}>{summary}</p>
+        </div>
+      )}
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+        {isMockup && html ? (
+          <iframe
+            srcDoc={html}
+            sandbox="allow-scripts"
+            style={{ width: '100%', height: '100%', minHeight: contentH, border: 'none', borderRadius: 10 }}
+            title={title}
+          />
+        ) : (
+          <div
+            ref={contentRef}
+            style={{ fontSize: 12, lineHeight: 1.7, color: '#2a2a3e' }}
+          />
+        )}
+      </div>
+
+      {/* Resize handles — nodrag class prevents React Flow from intercepting */}
+      {/* Right edge */}
+      <div
+        className="nodrag"
+        onMouseDown={e => startResize(e, 1, 0)}
+        style={{ position: 'absolute', top: 0, right: -3, width: 6, height: '100%', cursor: 'ew-resize' }}
+      />
+      {/* Bottom edge */}
+      <div
+        className="nodrag"
+        onMouseDown={e => startResize(e, 0, 1)}
+        style={{ position: 'absolute', bottom: -3, left: 0, width: '100%', height: 6, cursor: 'ns-resize' }}
+      />
+      {/* Bottom-right corner */}
+      <div
+        className="nodrag"
+        onMouseDown={e => startResize(e, 1, 1)}
+        style={{
+          position: 'absolute', bottom: 0, right: 0, width: 16, height: 16, cursor: 'nwse-resize',
+          borderBottomRightRadius: 16,
+        }}
+      />
+    </div>
+  );
+}
+
+function SkeletonNode({ data }: { data: { color: string } }) {
+  return (
+    <>
+      <Handle type="target" position={Position.Top} className="!bg-transparent !border-none !w-0 !h-0" />
+      <Handle type="target" position={Position.Bottom} className="!bg-transparent !border-none !w-0 !h-0" />
+      <Handle type="target" position={Position.Left} className="!bg-transparent !border-none !w-0 !h-0" />
+      <Handle type="target" position={Position.Right} className="!bg-transparent !border-none !w-0 !h-0" />
+      <div
+        className="node-spawn"
+        style={{
+          width: 160,
+          padding: '10px 14px',
+          background: 'linear-gradient(160deg, #ffffff 0%, #faf9f7 100%)',
+          border: `1.5px dashed ${data.color}`,
+          borderRadius: 14,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)',
+          opacity: 0.6,
+        }}
+      >
+        <div className="flex items-center gap-1.5 mb-2">
+          <div className="skeleton-shimmer h-[14px] w-[40px] rounded" />
+          <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: data.color }} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <div className="skeleton-shimmer h-[10px] w-[80%]" />
+          <div className="skeleton-shimmer h-[7px] w-[90%]" style={{ animationDelay: '0.1s' }} />
+          <div className="skeleton-shimmer h-[7px] w-[70%]" style={{ animationDelay: '0.2s' }} />
+          <div className="skeleton-shimmer h-[7px] w-[80%]" style={{ animationDelay: '0.3s' }} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ThinkingEdge({ id, sourceX, sourceY, targetX, targetY, data }: EdgeProps) {
+  const [edgePath] = getStraightPath({ sourceX, sourceY, targetX, targetY });
+  return (
+    <>
+      <path id={id} d={edgePath} stroke="#C8C4BC" strokeWidth={1.5} strokeDasharray="6 4" fill="none" />
+      {data?.isThinking && (
+        <circle r={3} fill={data?.color ?? '#C8C4BC'} opacity={0.7}>
+          <animateMotion dur="1.6s" repeatCount="indefinite">
+            <mpath href={`#${id}`} />
+          </animateMotion>
+        </circle>
+      )}
+    </>
+  );
 }
 
 const nodeTypes = {
@@ -61,6 +297,12 @@ const nodeTypes = {
   branch: BranchNode,
   note: NoteNode,
   deliverable: DeliverableNode,
+  skeleton: SkeletonNode,
+  panel: PanelNode,
+};
+
+const edgeTypes = {
+  thinking: ThinkingEdge,
 };
 
 const EDGE_STYLE = { stroke: '#C8C4BC', strokeWidth: 1.5, strokeDasharray: '6 4' };
@@ -79,7 +321,10 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
 
   // Keep a ref in sync so we can read current nodes without setState callbacks
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
-  const [expandedNodeId, setExpandedNodeId] = useState<string | null>(null);
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
+  // Track open order so most-recently-opened panel is on top
+  const [expandedNodeOrder, setExpandedNodeOrder] = useState<string[]>([]);
+  const [openPanels, setOpenPanels] = useState<Map<string, OpenPanel>>(new Map());
   const hasSpawnedRef = useRef(false);
   const hasTriggeredAgentsRef = useRef(false);
   const nodesRef = useRef<Node[]>([]);
@@ -87,6 +332,10 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
 
   // Agent states — tracks thinking/status for each branch
   const [agentStates, setAgentStates] = useState<Map<string, AgentState>>(new Map());
+
+  // Per-agent chat state
+  const [agentMessages, setAgentMessages] = useState<Map<string, ChatMessage[]>>(new Map());
+  const [agentChatLoading, setAgentChatLoading] = useState<Map<string, boolean>>(new Map());
 
   // Orchestrator chat state
   const [centerMessages, setCenterMessages] = useState<ChatMessage[]>([
@@ -110,6 +359,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
 
     // Initialize agent states
     const initialStates = new Map<string, AgentState>();
+    const initialMessages = new Map<string, ChatMessage[]>();
     branches.forEach(b => {
       initialStates.set(b.id, {
         branchId: b.id,
@@ -117,8 +367,14 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         currentThinking: 'Starting up...',
         deliverables: [],
       });
+      initialMessages.set(b.id, [{
+        id: `init-${b.id}`,
+        role: 'ai',
+        text: `Hi! I'm your **${b.label}** agent. Ask me anything about this branch once I'm done thinking.`,
+      }]);
     });
     setAgentStates(initialStates);
+    setAgentMessages(initialMessages);
 
     // Stagger agent starts
     branches.forEach((branch, index) => {
@@ -270,6 +526,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
       const y = by + Math.sin(angle) * radius;
       const nodeId = `deliv-${branchId}-${i}-${timestamp}`;
 
+      const delivType = (deliv.type === 'mockup' ? 'mockup' : 'doc') as 'doc' | 'mockup';
       newNodes.push({
         id: nodeId,
         type: 'deliverable',
@@ -279,12 +536,20 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
           summary: deliv.summary,
           content: deliv.content || '',
           html: deliv.html,
-          type: deliv.type,
+          type: delivType,
           color,
           isExpanded: false,
           isDimmed: false,
-          onExpand: () => handleDeliverableExpand(nodeId, x, y),
-          onCollapse: () => setExpandedNodeId(null),
+          onExpand: () => handleDeliverableExpand(nodeId, {
+            nodeId,
+            title: deliv.title,
+            summary: deliv.summary,
+            content: deliv.content || '',
+            html: deliv.html,
+            type: delivType,
+            color,
+          }),
+          onCollapse: () => handleDeliverableExpand(nodeId),
         },
       });
 
@@ -307,11 +572,60 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
     });
   }, [setNodes, setEdges]);
 
-  // Handle deliverable expand
-  const handleDeliverableExpand = useCallback((nodeId: string, x: number, y: number) => {
-    setCenterExpanded(false);
-    setExpandedNodeId(nodeId);
-  }, []);
+  // Handle deliverable expand — spawns/removes a panel node on the canvas
+  const handleDeliverableExpand = useCallback((nodeId: string, panelData?: OpenPanel) => {
+    const panelNodeId = `panel-${nodeId}`;
+    const panelEdgeId = `e-${nodeId}-${panelNodeId}`;
+
+    setExpandedNodeIds(prev => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) {
+        // Collapsing — remove panel node + edge
+        next.delete(nodeId);
+        setExpandedNodeOrder(o => o.filter(id => id !== nodeId));
+        setOpenPanels(p => { const n = new Map(p); n.delete(nodeId); return n; });
+        setNodes(nds => nds.filter(n => n.id !== panelNodeId));
+        setEdges(eds => eds.filter(e => e.id !== panelEdgeId));
+      } else {
+        // Expanding — spawn panel node near the deliverable chip
+        next.add(nodeId);
+        setExpandedNodeOrder(o => [...o.filter(id => id !== nodeId), nodeId]);
+        if (panelData) {
+          setOpenPanels(p => new Map(p).set(nodeId, panelData));
+
+          // Find the deliverable chip position
+          const delivNode = nodesRef.current.find(n => n.id === nodeId);
+          if (delivNode) {
+            // Place the panel to the right and slightly below the chip
+            const px = delivNode.position.x + 160;
+            const py = delivNode.position.y - 20;
+
+            const panelNode: Node = {
+              id: panelNodeId,
+              type: 'panel',
+              position: { x: px, y: py },
+              data: {
+                ...panelData,
+                onClose: () => handleDeliverableExpand(nodeId),
+              },
+            };
+
+            const panelEdge: Edge = {
+              id: panelEdgeId,
+              source: nodeId,
+              target: panelNodeId,
+              type: 'straight',
+              style: { ...EDGE_STYLE, stroke: `${panelData.color}60` },
+            };
+
+            setNodes(nds => [...nds, panelNode]);
+            setEdges(eds => [...eds, panelEdge]);
+          }
+        }
+      }
+      return next;
+    });
+  }, [setNodes, setEdges]);
 
   // Update floating message when branches arrive
   useEffect(() => {
@@ -495,9 +809,56 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
     }
   }, [centerMessages, idea, agentStates, branches, pushNodesForCard]);
 
+  // Handle per-agent chat
+  const handleAgentSendMessage = useCallback(async (branchId: string, text: string) => {
+    const branch = branches.find(b => b.id === branchId);
+    if (!branch) return;
+
+    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text };
+
+    setAgentMessages(prev => {
+      const next = new Map(prev);
+      next.set(branchId, [...(next.get(branchId) || []), userMsg]);
+      return next;
+    });
+    setAgentChatLoading(prev => { const next = new Map(prev); next.set(branchId, true); return next; });
+
+    try {
+      const currentMessages = agentMessages.get(branchId) || [];
+      const agentState = agentStates.get(branchId);
+      const deliverablesContext = agentState?.deliverables.length
+        ? `\n\nYour deliverables so far:\n${agentState.deliverables.map(d => `- ${d.title}: ${d.summary}`).join('\n')}`
+        : '';
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...currentMessages, userMsg],
+          agentPersonality: `You are the ${branch.label} expert agent in a brainstorming session about "${idea}". ${branch.agentPersonality}${deliverablesContext}\n\nBe conversational and concise (2-3 sentences). Help the user go deeper on this branch.`,
+          nodeLabel: branch.label,
+          rootIdea: idea,
+        }),
+      });
+
+      if (res.ok) {
+        const { reply } = await res.json();
+        const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'ai', text: reply };
+        setAgentMessages(prev => {
+          const next = new Map(prev);
+          next.set(branchId, [...(next.get(branchId) || []), aiMsg]);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error(`Agent ${branchId} chat error:`, err);
+    } finally {
+      setAgentChatLoading(prev => { const next = new Map(prev); next.set(branchId, false); return next; });
+    }
+  }, [branches, idea, agentMessages, agentStates]);
+
   // Handle center node expand
   const handleCenterExpand = useCallback(() => {
-    setExpandedNodeId(null);
     // Do NOT dismiss the response card — the user should still see chat history
     setCenterExpanded(true);
   }, []);
@@ -508,11 +869,86 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
 
   // Deep-dive panel state
   const [openPanelBranchId, setOpenPanelBranchId] = useState<string | null>(null);
+  const branchExpandSavedRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
-  // Handle agent click — open side panel
+  // Handle agent click — expand branch inline with chat, push deliverables outward
   const handleAgentClick = useCallback((branchId: string) => {
-    setOpenPanelBranchId(prev => prev === branchId ? null : branchId);
-  }, []);
+    setOpenPanelBranchId(prev => {
+      const isClosing = prev === branchId;
+
+      if (isClosing) {
+        // Restore deliverable positions
+        const saved = branchExpandSavedRef.current;
+        if (saved.size > 0) {
+          setNodes(nds => nds.map(n => {
+            const pos = saved.get(n.id);
+            return pos ? { ...n, position: pos } : n;
+          }));
+          branchExpandSavedRef.current = new Map();
+        }
+        return null;
+      }
+
+      // Opening — push this branch's deliverables outward so they don't overlap
+      // Also restore any previously saved positions from another branch
+      const prevSaved = branchExpandSavedRef.current;
+
+      setNodes(nds => {
+        // First restore any previously pushed nodes
+        let restored = prevSaved.size > 0
+          ? nds.map(n => {
+              const pos = prevSaved.get(n.id);
+              return pos ? { ...n, position: pos } : n;
+            })
+          : nds;
+
+        const branchNode = restored.find(n => n.id === branchId);
+        if (!branchNode) return restored;
+
+        const bx = branchNode.position.x;
+        const by = branchNode.position.y;
+        const newSaved = new Map<string, { x: number; y: number }>();
+
+        // The expanded branch card is ~280×200. Push deliverables that are too close.
+        const expandedW = 300;
+        const expandedH = 240;
+        const minDistance = 180; // minimum distance from branch center
+
+        restored = restored.map(n => {
+          // Match deliverable nodes belonging to this branch
+          if (n.type !== 'deliverable' || !n.id.includes(branchId)) return n;
+
+          const dx = n.position.x - bx;
+          const dy = n.position.y - by;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          // Check if node is within the expanded card bounding box or too close
+          const withinX = n.position.x > bx - 40 && n.position.x < bx + expandedW;
+          const withinY = n.position.y > by - 40 && n.position.y < by + expandedH;
+
+          if ((withinX && withinY) || dist < minDistance) {
+            newSaved.set(n.id, { x: n.position.x, y: n.position.y });
+            // Push outward along the angle from branch to deliverable
+            const angle = Math.atan2(dy || 1, dx || 1); // avoid zero
+            const pushDist = Math.max(minDistance + 60, dist + 120);
+            return {
+              ...n,
+              position: {
+                x: bx + Math.cos(angle) * pushDist,
+                y: by + Math.sin(angle) * pushDist,
+              },
+            };
+          }
+          return n;
+        });
+
+        branchExpandSavedRef.current = newSaved;
+        return restored;
+      });
+
+      return branchId;
+    });
+  }, [setNodes]);
 
   // Handle note text change
   const handleNoteTextChange = useCallback((nodeId: string, text: string) => {
@@ -592,6 +1028,50 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
     });
   }, [idea, isLoading, centerExpanded, floatingMessages, centerMessages, isCenterChatLoading, setNodes, handleCenterExpand, handleCenterCollapse, handleCenterSendMessage, responseCard, handleDismissResponse, spawnNoteFromNode]);
 
+  // Spawn skeleton placeholder nodes while branches are loading
+  const hasSpawnedSkeletonRef = useRef(false);
+  useEffect(() => {
+    if (!isLoading || hasSpawnedSkeletonRef.current || hasSpawnedRef.current) return;
+    hasSpawnedSkeletonRef.current = true;
+
+    const count = 5; // typical number of branches
+    const skeletonNodes: Node[] = [];
+    const skeletonEdges: Edge[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * 2 * Math.PI - Math.PI / 2;
+      const x = Math.cos(angle) * 400;
+      const y = Math.sin(angle) * 320;
+      const id = `skeleton-${i}`;
+      const color = BRANCH_COLORS[i % BRANCH_COLORS.length];
+
+      skeletonNodes.push({
+        id,
+        type: 'skeleton',
+        position: { x, y },
+        draggable: false,
+        selectable: false,
+        data: { color },
+      });
+
+      skeletonEdges.push({
+        id: `e-center-${id}`,
+        source: 'center',
+        target: id,
+        type: 'thinking',
+        data: { isThinking: true, color },
+      });
+    }
+
+    setTimeout(() => {
+      setNodes(prev => [...prev, ...skeletonNodes]);
+      setEdges(skeletonEdges);
+      setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.25, duration: 700, minZoom: 0.4, maxZoom: 0.85 });
+      }, 350);
+    }, 150);
+  }, [isLoading, setNodes, setEdges, reactFlowInstance]);
+
   // Spawn branch nodes when branches arrive
   useEffect(() => {
     if (branches.length === 0 || hasSpawnedRef.current) return;
@@ -624,6 +1104,10 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
           spawnDelay: index * 100,
           agentThinking: undefined,
           agentStatus: 'idle' as const,
+          isExpanded: false,
+          messages: [],
+          onSendMessage: (_: string) => {},
+          isChatLoading: false,
         },
       });
 
@@ -631,14 +1115,14 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         id: `e-center-${branch.id}`,
         source: 'center',
         target: branch.id,
-        type: 'straight',
-        style: EDGE_STYLE,
+        type: 'thinking',
+        data: { isThinking: true, color },
       });
     });
 
     const maxSpawnDelay = (total - 1) * 100;
     setTimeout(() => {
-      setNodes(prev => [...prev, ...newNodes]);
+      setNodes(prev => [...prev.filter(n => !n.id.startsWith('skeleton-')), ...newNodes]);
       setEdges(newEdges);
       setTimeout(() => {
         reactFlowInstance.fitView({ padding: 0.25, duration: 700, minZoom: 0.4, maxZoom: 0.85 });
@@ -646,8 +1130,23 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
     }, 150);
   }, [branches, idea, setNodes, setEdges, reactFlowInstance, handleAgentClick, spawnNoteFromNode]);
 
-  // Update branch node data when agentStates or expandedNodeId changes
+  // Update branch node data when agentStates or expandedNodeIds changes
   useEffect(() => {
+    // Sync traveling dot on center-to-branch edges
+    setEdges(eds => eds.map(edge => {
+      if (edge.id.startsWith('e-center-')) {
+        const agentState = agentStates.get(edge.target);
+        return {
+          ...edge,
+          data: {
+            ...edge.data,
+            isThinking: agentState?.status === 'thinking',
+          },
+        };
+      }
+      return edge;
+    }));
+
     setNodes(nds =>
       nds.map(node => {
         if (node.type === 'branch') {
@@ -656,40 +1155,60 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
             ...node,
             data: {
               ...node.data,
-              isDimmed: !!expandedNodeId && expandedNodeId !== node.id,
+              isDimmed: false,
               onClickAgent: () => handleAgentClick(node.id),
               onAddNode: () => spawnNoteFromNode(node.id),
               agentThinking: agentState?.currentThinking,
               agentStatus: agentState?.status || 'idle',
+              isExpanded: openPanelBranchId === node.id,
+              messages: agentMessages.get(node.id) || [],
+              onSendMessage: (text: string) => handleAgentSendMessage(node.id, text),
+              isChatLoading: agentChatLoading.get(node.id) || false,
             },
           };
         }
         if (node.type === 'deliverable') {
-          const nodeX = node.position.x;
-          const nodeY = node.position.y;
           return {
             ...node,
             data: {
               ...node.data,
-              isExpanded: expandedNodeId === node.id,
-              isDimmed: !!expandedNodeId && expandedNodeId !== node.id,
-              onExpand: () => handleDeliverableExpand(node.id, nodeX, nodeY),
-              onCollapse: () => setExpandedNodeId(null),
+              isExpanded: expandedNodeIds.has(node.id),
+              isDimmed: false,
+              onExpand: () => handleDeliverableExpand(node.id, {
+                nodeId: node.id,
+                title: node.data.title,
+                summary: node.data.summary || '',
+                content: node.data.content || '',
+                html: node.data.html,
+                type: node.data.type,
+                color: node.data.color,
+              }),
+              onCollapse: () => handleDeliverableExpand(node.id),
+            },
+          };
+        }
+        if (node.type === 'panel') {
+          // Extract the deliverable nodeId from the panel node id (panel-deliv-...)
+          const delivNodeId = node.id.replace(/^panel-/, '');
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              onClose: () => handleDeliverableExpand(delivNodeId),
             },
           };
         }
         return node;
       })
     );
-  }, [expandedNodeId, agentStates, setNodes, handleAgentClick, handleDeliverableExpand, spawnNoteFromNode]);
+  }, [expandedNodeIds, expandedNodeOrder, agentStates, openPanelBranchId, agentMessages, agentChatLoading, setNodes, setEdges, handleAgentClick, handleDeliverableExpand, handleAgentSendMessage, spawnNoteFromNode]);
 
   // Double-click canvas pane to add a note
   const lastPaneClickRef = useRef<number>(0);
   const lastPaneClickPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const onPaneClickWithDoubleDetect = useCallback((event: React.MouseEvent) => {
-    // Single-click: collapse expanded nodes
-    if (expandedNodeId) setExpandedNodeId(null);
+    // Single-click: collapse center chat if open
     if (centerExpanded) setCenterExpanded(false);
 
     const now = Date.now();
@@ -721,7 +1240,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
       lastPaneClickRef.current = now;
       lastPaneClickPosRef.current = { x: event.clientX, y: event.clientY };
     }
-  }, [expandedNodeId, centerExpanded, responseCard, handleDismissResponse, reactFlowInstance, setNodes, handleNoteTextChange]);
+  }, [centerExpanded, responseCard, handleDismissResponse, reactFlowInstance, setNodes, handleNoteTextChange]);
 
   return (
     <div className="w-full h-full">
@@ -733,20 +1252,14 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         onEdgesChange={onEdgesChange}
         onPaneClick={onPaneClickWithDoubleDetect}
         onNodeClick={(_, node) => {
-          if (node.id === 'center') {
-            if (centerExpanded) handleCenterCollapse();
-            else handleCenterExpand();
-          } else if (node.type === 'branch') {
+          if (node.type === 'branch') {
             handleAgentClick(node.id);
-          } else if (node.type === 'deliverable') {
-            const isExp = expandedNodeId === node.id;
-            if (isExp) setExpandedNodeId(null);
-            else handleDeliverableExpand(node.id, node.position.x, node.position.y);
           }
         }}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         defaultViewport={{ x: window.innerWidth / 2, y: window.innerHeight / 2, zoom: 0.75 }}
-        nodesDraggable={!expandedNodeId && !centerExpanded}
+        nodesDraggable={!centerExpanded}
         nodesConnectable={false}
         elementsSelectable={true}
         selectNodesOnDrag={false}
@@ -764,26 +1277,7 @@ function SynapseCanvasInner({ idea, branches, isLoading }: SynapseCanvasProps) {
         />
       </ReactFlow>
 
-      {/* Agent deep-dive panel */}
-      {openPanelBranchId && (() => {
-        const branch = branches.find(b => b.id === openPanelBranchId);
-        const agentState = agentStates.get(openPanelBranchId);
-        const colorIndex = branches.findIndex(b => b.id === openPanelBranchId);
-        const color = BRANCH_COLORS[colorIndex % BRANCH_COLORS.length];
 
-        if (!branch) return null;
-
-        return (
-          <AgentDetailPanel
-            label={branch.label}
-            color={color}
-            status={agentState?.status || 'idle'}
-            currentThinking={agentState?.currentThinking || ''}
-            deliverables={agentState?.deliverables || []}
-            onClose={() => setOpenPanelBranchId(null)}
-          />
-        );
-      })()}
     </div>
   );
 }
