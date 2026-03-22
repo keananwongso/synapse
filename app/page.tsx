@@ -1,292 +1,244 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { Canvas } from '@/components/Canvas';
-import { InputBar } from '@/components/InputBar';
-import { ActionPanel } from '@/components/ActionPanel';
-import { Node, Connection, Cluster } from '@/lib/types';
-import { usePhysics } from '@/hooks/usePhysics';
-import { useAgentResults } from '@/hooks/useAgentResults';
-import { generateId, debounce } from '@/lib/utils';
-import { initializeNodePhysics } from '@/lib/physics';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { ArrowUp, Plus, FileText, Settings, LogOut } from 'lucide-react';
+import dynamic from 'next/dynamic';
 
-export default function DriftPage() {
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [connections, setConnections] = useState<Connection[]>([]);
-  const [clusters, setClusters] = useState<Cluster[]>([]);
-  const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingStatus, setProcessingStatus] = useState('');
-  const [pan, setPan] = useState({ x: 400, y: 300 });
-  const [zoom, setZoom] = useState(1);
+const SynapseCanvas = dynamic(() => import('@/components/SynapseCanvas'), { ssr: false });
 
-  // Physics simulation
-  const { wake } = usePhysics({
-    nodes,
-    connections,
-    onUpdate: setNodes,
-    enabled: true,
-    pan,
-    zoom,
-  });
+type Phase = 'homepage' | 'collapsing' | 'canvas';
 
-  // Helper: Spawn nodes from chatbox position (bottom-center of viewport)
-  const spawnNodesFromChatbox = useCallback(
-    (nodeData: Array<{ text: string; isAI: boolean; nodeType: Node['nodeType']; metadata?: any }>) => {
-      // Convert screen center to world coordinates using current pan/zoom
-      const baseX = (window.innerWidth / 2 - pan.x) / zoom;
-      const baseY = (window.innerHeight / 2 - pan.y) / zoom;
+interface Branch {
+  id: string;
+  label: string;
+  description: string;
+  color: string;
+  agentPersonality: string;
+}
 
-      const newNodes: Node[] = nodeData.map((data, index) => {
-        // Add some spread so nodes don't spawn on top of each other
-        const angle = (Math.PI * 2 * index) / nodeData.length;
-        const spread = 80;
-        const offsetX = Math.cos(angle) * spread;
-        const offsetY = Math.sin(angle) * spread;
+const SUGGESTIONS = [
+  { emoji: '🎉', text: 'Birthday party', bg: '#dce8d8', border: '#c5d9bf', hoverBorder: '#8aba7a' },
+  { emoji: '🚀', text: 'Startup launch', bg: '#e2dced', border: '#d1c9e0', hoverBorder: '#a893c9' },
+  { emoji: '📝', text: 'Thesis writing', bg: '#f0e0d0', border: '#e6d2be', hoverBorder: '#d4a87a' },
+  { emoji: '🎵', text: 'Music festival', bg: '#d5e5e8', border: '#c0d8dc', hoverBorder: '#7fbbc4' },
+];
 
-        // Add outward velocity so nodes drift away from origin
-        const velocityStrength = 3;
-        const vx = Math.cos(angle) * velocityStrength;
-        const vy = Math.sin(angle) * velocityStrength;
+const DUMMY_SESSIONS = [
+  { id: '1', title: 'Coffee shop branding' },
+  { id: '2', title: 'Hackathon project ideas' },
+  { id: '3', title: 'Marketing strategy Q2' },
+];
 
-        return initializeNodePhysics({
-          id: generateId(),
-          text: data.text,
-          x: baseX + offsetX,
-          y: baseY + offsetY,
-          vx,
-          vy,
-          isAI: data.isAI,
-          isDragging: false,
-          nodeType: data.nodeType,
-          metadata: data.metadata || {},
-          relatedNodeIds: [],
-        });
-      });
+export default function SynapsePage() {
+  const [phase, setPhase] = useState<Phase>('homepage');
+  const [idea, setIdea] = useState('');
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-      setNodes((prev) => [...prev, ...newNodes]);
-      wake(); // Wake physics
+  useEffect(() => {
+    if (phase === 'homepage') {
+      const timer = setTimeout(() => inputRef.current?.focus(), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [phase]);
 
-      return newNodes;
-    },
-    [wake, pan, zoom]
-  );
+  const handleSubmit = useCallback(async () => {
+    const trimmed = idea.trim();
+    if (!trimmed || isLoading) return;
 
-  // Listen for agent results via Realtime
-  const handleAgentResults = useCallback((nodeType: string, results: any[]) => {
-    console.log('🎉 Agent results received:', nodeType, results);
+    setIsLoading(true);
+    setPhase('collapsing');
 
-    // Spawn nodes from results
-    const newNodeData = results.map((result: any) => ({
-      text: result.text,
-      isAI: true,
-      nodeType: nodeType as Node['nodeType'],
-      metadata: result.metadata || {},
-    }));
-
-    spawnNodesFromChatbox(newNodeData);
-
-    // Clear processing state
-    setIsProcessing(false);
-    setProcessingStatus('');
-  }, [spawnNodesFromChatbox]);
-
-  useAgentResults(handleAgentResults);
-
-  // Handle chat input submission
-  const handleChatSubmit = useCallback(
-    async (input: string) => {
-      setIsProcessing(true);
-      setProcessingStatus('Understanding your request...');
-
-      try {
-        // Step 1: Process input to determine intent
-        console.log('💬 Processing input:', input);
-        const processResponse = await fetch('/api/process', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            input,
-            context: {
-              nodeCount: nodes.length,
-              topics: clusters.map((c) => c.label),
-            },
-          }),
-        });
-
-        if (!processResponse.ok) throw new Error('Failed to process input');
-
-        const { action, parameters, summary } = await processResponse.json();
-
-        console.log('🎯 Intent:', action, '|', summary);
-        setProcessingStatus(summary);
-
-        // Step 2: Execute the appropriate action
-        if (action === 'note') {
-          // Simple note — no agent needed
-          spawnNodesFromChatbox([
-            { text: parameters.topic, isAI: false, nodeType: 'thought', metadata: {} },
-          ]);
-          setIsProcessing(false);
-          setProcessingStatus('');
-        } else {
-          // All agent-backed actions follow the same pattern
-          const agentRoutes: Record<string, { endpoint: string; label: string; icon: string }> = {
-            brainstorm: { endpoint: '/api/ai/brainstorm', label: 'brainstorm', icon: '🧠' },
-            research:   { endpoint: '/api/ai/research',   label: 'research',   icon: '🔍' },
-            plan:       { endpoint: '/api/ai/plan',       label: 'planner',    icon: '📋' },
-            write:      { endpoint: '/api/ai/write',      label: 'writer',     icon: '✍️' },
-            mockup:     { endpoint: '/api/ai/mockup',     label: 'mockup',     icon: '🎨' },
-          };
-
-          const route = agentRoutes[action];
-          if (route) {
-            console.log(`${route.icon} ${route.label}:`, parameters.topic);
-            setProcessingStatus(`Dispatching ${route.label} agent...`);
-
-            const response = await fetch(route.endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                topic: parameters.topic,
-                count: parameters.count || 3,
-                focus: parameters.focus,
-              }),
-            });
-
-            if (!response.ok) throw new Error(`${route.label} agent failed`);
-
-            const { taskId } = await response.json();
-            console.log('📝 Task created:', taskId);
-            setProcessingStatus('Waiting for agent results...');
-          } else {
-            console.log('⚠️ Unknown action:', action);
-            setIsProcessing(false);
-            setProcessingStatus('');
-          }
-        }
-
-        console.log('✅ Task dispatched');
-      } catch (error) {
-        console.error('❌ Chat processing error:', error);
-        setIsProcessing(false);
-        setProcessingStatus('');
-      }
-      // Don't clear processing state in finally - useAgentResults will handle that when results arrive
-    },
-    [nodes, clusters, spawnNodesFromChatbox]
-  );
-
-  // Handle node drag (with optional throw velocity on release)
-  const handleNodeDrag = useCallback(
-    (id: string, x: number, y: number, isDragging: boolean, throwVx?: number, throwVy?: number) => {
-      setNodes((prev) =>
-        prev.map((node) =>
-          node.id === id
-            ? {
-                ...node,
-                x,
-                y,
-                isDragging,
-                vx: isDragging ? 0 : (throwVx || 0),
-                vy: isDragging ? 0 : (throwVy || 0),
-              }
-            : node
-        )
-      );
-
-      if (!isDragging) {
-        wake(); // Wake physics after drag ends
-      }
-    },
-    [wake]
-  );
-
-  // Handle cluster click
-  const handleClusterClick = useCallback((cluster: Cluster) => {
-    setSelectedCluster(cluster);
-  }, []);
-
-  // Handle brainstorm action
-  const handleBrainstorm = useCallback(async () => {
-    if (!selectedCluster) return;
-
-    const clusterNodes = nodes.filter((n) =>
-      selectedCluster.nodeIds.includes(n.id)
-    );
-
-    console.log('🧠 Brainstorming for cluster:', selectedCluster.label);
-    setIsProcessing(true);
-    setProcessingStatus('Dispatching brainstorm agent...');
+    await new Promise((r) => setTimeout(r, 500));
+    setPhase('canvas');
 
     try {
-      const response = await fetch('/api/ai/brainstorm', {
+      const res = await fetch('/api/branch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: selectedCluster.label,
-          count: 3,
-          focus: clusterNodes.map((n) => n.text).join(', '),
-        }),
+        body: JSON.stringify({ idea: trimmed }),
       });
-
-      if (!response.ok) throw new Error('Brainstorm failed');
-
-      const { taskId } = await response.json();
-      console.log('📝 Task created:', taskId);
-      setProcessingStatus('Waiting for agent results...');
-
-      // Results will arrive via Realtime subscription (handled by useAgentResults hook)
-    } catch (error) {
-      console.error('❌ Brainstorm error:', error);
-      setIsProcessing(false);
-      setProcessingStatus('');
+      if (!res.ok) throw new Error('Branch failed');
+      const data = await res.json();
+      setBranches(data.branches);
+    } catch (err) {
+      console.error('Branch error:', err);
+      setBranches([
+        { id: '1', label: 'Planning', description: 'Overall planning', color: '#d4edda', agentPersonality: 'Think systematically about planning.' },
+        { id: '2', label: 'Research', description: 'Research needed', color: '#cce5ff', agentPersonality: 'Think analytically about research.' },
+        { id: '3', label: 'Budget', description: 'Budget considerations', color: '#fff3cd', agentPersonality: 'Think practically about costs.' },
+        { id: '4', label: 'Timeline', description: 'Timeline and deadlines', color: '#f8d7da', agentPersonality: 'Think about scheduling.' },
+      ]);
+    } finally {
+      setIsLoading(false);
     }
-  }, [selectedCluster, nodes]);
+  }, [idea, isLoading]);
 
-  return (
-    <main className="w-screen h-screen overflow-hidden">
-      {/* Canvas with nodes and connections */}
-      <Canvas
-        nodes={nodes}
-        connections={connections}
-        clusters={clusters}
-        onNodeDrag={handleNodeDrag}
-        onCanvasClick={() => setSelectedCluster(null)}
-        onClusterClick={handleClusterClick}
-        initialPan={pan}
-        onPanChange={setPan}
-        onZoomChange={setZoom}
-      />
+  const handleChipClick = (text: string) => {
+    setIdea(text);
+    inputRef.current?.focus();
+  };
 
-      {/* Input bar */}
-      <InputBar
-        onSubmit={handleChatSubmit}
-        isProcessing={isProcessing}
-        placeholder={
-          isProcessing && processingStatus
-            ? processingStatus
-            : "What would you like to explore?"
-        }
-      />
+  // ─── SIDEBAR ───
+  const sidebar = (
+    <div className="fixed top-0 left-0 w-16 h-screen bg-[#1a1a2e] flex flex-col items-center py-4 z-50">
+      <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center mb-1">
+        <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
+          <circle cx="4" cy="7" r="2" fill="white" />
+          <circle cx="10" cy="7" r="2" fill="white" />
+          <line x1="6" y1="7" x2="8" y2="7" stroke="white" strokeWidth="1.5" />
+        </svg>
+      </div>
+      <div className="w-8 h-px bg-white/10 my-3" />
+      <button className="w-9 h-9 rounded-lg flex items-center justify-center text-white/60 hover:text-white hover:bg-white/[0.08] transition-all mb-3">
+        <Plus size={18} />
+      </button>
+      <div className="flex flex-col gap-1 w-full px-2">
+        {DUMMY_SESSIONS.map((s) => (
+          <button
+            key={s.id}
+            className="flex items-center gap-1.5 px-1.5 py-2 rounded-md text-white/50 hover:text-white/80 hover:bg-white/[0.08] transition-all w-full"
+            title={s.title}
+          >
+            <FileText size={14} className="shrink-0" />
+            <span className="text-[10px] truncate">{s.title}</span>
+          </button>
+        ))}
+      </div>
+      <div className="flex-grow" />
+      <button className="w-9 h-9 rounded-lg flex items-center justify-center text-white/60 hover:text-white hover:bg-white/[0.08] transition-all mb-1">
+        <Settings size={18} />
+      </button>
+      <button className="w-9 h-9 rounded-lg flex items-center justify-center text-white/60 hover:text-white hover:bg-white/[0.08] transition-all">
+        <LogOut size={18} />
+      </button>
+    </div>
+  );
 
-      {/* Action panel */}
-      <ActionPanel
-        cluster={selectedCluster}
-        nodes={nodes}
-        onClose={() => setSelectedCluster(null)}
-        onBrainstorm={handleBrainstorm}
-        isLoading={{}}
-      />
+  // ─── HOMEPAGE ───
+  if (phase === 'homepage' || phase === 'collapsing') {
+    return (
+      <div className="h-screen w-screen flex">
+        {sidebar}
+        <div className="flex-1 ml-16 dot-grid flex flex-col items-center justify-center relative overflow-hidden">
+          {/* Radial glow */}
+          <div
+            className="absolute inset-0 pointer-events-none entrance-glow"
+            style={{
+              background: 'radial-gradient(ellipse 800px 500px at 50% 65%, rgba(200,230,192,0.4) 0%, transparent 65%)',
+            }}
+          />
 
-      {/* Status indicator */}
-      {isProcessing && processingStatus && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-[#E7E3DC]/90 backdrop-blur-sm
-                        rounded-full border border-[#CFCBC3] text-xs text-[#1A1A1A]/70 flex items-center gap-2 animate-in">
-          <div className="w-2 h-2 bg-[#D4A857] rounded-full animate-pulse" />
-          {processingStatus}
+          {/* Content container */}
+          <div
+            className="flex flex-col items-center relative z-[1]"
+            style={{
+              opacity: phase === 'collapsing' ? 0 : undefined,
+              transform: phase === 'collapsing' ? 'translateY(-20px)' : undefined,
+              transition: phase === 'collapsing' ? 'all 0.5s ease' : undefined,
+            }}
+          >
+            {/* Badge */}
+            <div className="entrance-badge">
+              <div className="mb-5 px-3.5 py-1.5 rounded-full bg-[#f0eeea] text-[11px] text-[#888780] font-medium tracking-wide">
+                ✦ AI-powered brainstorming
+              </div>
+            </div>
+
+            {/* h1 */}
+            <div className="entrance-h1">
+              <h1 className="text-[36px] font-medium text-[#1a1a2e] text-center leading-[1.2]" style={{ letterSpacing: '-0.5px' }}>
+                Your thoughts,<br />beautifully untangled
+              </h1>
+            </div>
+
+            {/* Subtitle */}
+            <div className="entrance-subtitle">
+              <p className="text-[15px] text-[#888780] mt-4 text-center">
+                Type an idea. Watch it grow into something actionable.
+              </p>
+            </div>
+
+            {/* Chatbox */}
+            <div
+              className="mt-12 w-full flex justify-center entrance-chatbox"
+              style={phase === 'collapsing' ? { transform: 'scale(0.1)', opacity: 0, transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)' } : undefined}
+            >
+              <div
+                className="relative rounded-[18px] shadow-[0_2px_12px_rgba(0,0,0,0.05)] focus-within:shadow-[0_0_0_3px_rgba(176,206,184,0.18)] transition-shadow duration-200"
+                style={{
+                  width: '640px',
+                  maxWidth: 'calc(100vw - 8rem)',
+                  backgroundColor: '#fdfcfa',
+                  border: '1px solid #e0ddd8',
+                  borderLeft: '3px solid #4a9e6b',
+                }}
+              >
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={idea}
+                  onChange={(e) => setIdea(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleSubmit(); }
+                  }}
+                  placeholder="What are you working on?"
+                  className="w-full bg-transparent pl-5 pr-16 text-[16px] text-[#1a1a2e] placeholder:text-[#B4B2A9] outline-none rounded-[18px]"
+                  style={{ height: '56px', lineHeight: '56px' }}
+                  disabled={phase === 'collapsing'}
+                />
+                <button
+                  onClick={handleSubmit}
+                  disabled={!idea.trim() || phase === 'collapsing'}
+                  className="absolute right-0 top-0 w-14 h-14 rounded-r-[18px] bg-[#1a1a2e] flex items-center justify-center transition-opacity disabled:opacity-30 hover:opacity-80"
+                >
+                  <ArrowUp className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Chips */}
+            <div className="mt-6 flex flex-wrap justify-center gap-2.5">
+              {SUGGESTIONS.map((s, i) => (
+                <div key={s.text} className={`entrance-chip-${i}`}>
+                  <button
+                    onClick={() => handleChipClick(s.text)}
+                    className="flex items-center gap-2 rounded-full text-[12px] text-[#555] hover:text-[#1a1a2e] transition-all"
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: s.bg,
+                      border: `1px solid ${s.border}`,
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = s.hoverBorder; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = s.border; }}
+                  >
+                    <span>{s.emoji}</span>
+                    <span>{s.text}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer hint */}
+            <div className="entrance-footer">
+              <p className="mt-8 text-[12px] text-[#b4b2a9]">
+                Press Enter to branch your idea into focused AI agents
+              </p>
+            </div>
+          </div>
         </div>
-      )}
-    </main>
+      </div>
+    );
+  }
+
+  // ─── CANVAS ───
+  return (
+    <div className="h-screen w-screen flex">
+      {sidebar}
+      <div className="flex-1 ml-16 h-screen">
+        <SynapseCanvas idea={idea} branches={branches} isLoading={isLoading} />
+      </div>
+    </div>
   );
 }

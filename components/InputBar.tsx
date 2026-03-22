@@ -45,8 +45,8 @@ export function InputBar({
 
   return (
     <div
-      className="fixed bottom-8 z-50 pointer-events-auto"
-      style={{ left: '50%', transform: 'translateX(-50%)', width: '576px', maxWidth: 'calc(100vw - 2rem)' }}
+      className="fixed z-50 pointer-events-auto"
+      style={{ left: '50%', bottom: '25%', transform: 'translateX(-50%)', width: '576px', maxWidth: 'calc(100vw - 2rem)' }}
     >
       <div className="relative w-full flex flex-col gap-2">
         {/* Input container with glass morphism */}

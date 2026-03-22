@@ -67,6 +67,22 @@ export const NODE_STYLES: Record<string, {
   },
 };
 
+// Raw color values per node type (for inline styles in chat UI)
+export const NODE_COLORS: Record<string, {
+  bg: string;        // pastel background
+  bgDarker: string;  // slightly darker for user messages
+  accent: string;    // border accent / dot color
+  dot: string;       // colored dot in chat header
+}> = {
+  thought:   { bg: '#F2EFE9', bgDarker: '#E7E3DC', accent: '#CFCBC3', dot: '#B8B3AB' },
+  ai_idea:   { bg: '#FBF5E6', bgDarker: '#F3E8C8', accent: '#D4A857', dot: '#D4A857' },
+  research:  { bg: '#EEF1F5', bgDarker: '#DCE3EE', accent: '#8BA4C4', dot: '#6B8BB8' },
+  document:  { bg: '#EEF4EF', bgDarker: '#D8EAD9', accent: '#7CAE7F', dot: '#5A9E5E' },
+  mockup:    { bg: '#F5F0E8', bgDarker: '#EDE4D3', accent: '#D4A857', dot: '#C49A40' },
+  checklist: { bg: '#F0EDF5', bgDarker: '#E3DCEE', accent: '#B8A8D4', dot: '#9B87C4' },
+  chart:     { bg: '#EDF3F8', bgDarker: '#D8E6F0', accent: '#8BA4C4', dot: '#6B8BB8' },
+};
+
 // Animation durations
 export const ANIMATIONS = {
   NODE_FADE_IN: 300,

@@ -18,6 +18,9 @@ interface CanvasProps {
   initialPan?: { x: number; y: number };
   onPanChange?: (pan: { x: number; y: number }) => void;
   onZoomChange?: (zoom: number) => void;
+  expandedNodeId?: string | null;
+  onNodeExpand?: (id: string) => void;
+  onNodeCollapse?: () => void;
 }
 
 export function Canvas({
@@ -31,6 +34,9 @@ export function Canvas({
   initialPan = { x: 400, y: 300 },
   onPanChange,
   onZoomChange,
+  expandedNodeId,
+  onNodeExpand,
+  onNodeCollapse,
 }: CanvasProps) {
   const [pan, setPan] = useState(initialPan);
   const [zoom, setZoom] = useState(1);
@@ -105,8 +111,11 @@ export function Canvas({
 
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget || e.target === canvasRef.current) {
-      if (!isDraggingCanvasRef.current && onCanvasClick) {
-        onCanvasClick();
+      if (!isDraggingCanvasRef.current) {
+        if (expandedNodeId) {
+          onNodeCollapse?.();
+        }
+        onCanvasClick?.();
       }
     }
   };
@@ -151,6 +160,10 @@ export function Canvas({
             onDrag={onNodeDrag}
             onClick={onNodeClick}
             zoom={zoom}
+            isExpanded={expandedNodeId === node.id}
+            isDimmed={!!expandedNodeId && expandedNodeId !== node.id}
+            onExpand={onNodeExpand}
+            onCollapse={onNodeCollapse}
           />
         ))}
 
